@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="本地运行的交互式练耳训练工具，支持音程辨认、和弦进行辨认、历史记录与能力报告。"
+    />
+    <meta name="theme-color" content="#08151b" />
+    <title>声阶 · Ear Training</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2308151b'/%3E%3Cpath d='M13 35h7l5-16 8 30 6-22 5 8h7' fill='none' stroke='%23c9ff55' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="声阶首页">
+          <span class="brand-mark" aria-hidden="true">∿</span>
+          <span>声阶</span>
+        </a>
+        <nav class="main-nav" aria-label="主导航">
+          <button class="nav-item is-active" data-view="train">训练</button>
+          <button class="nav-item" data-view="history">历史</button>
+          <button class="nav-item" data-view="report">报告</button>
+        </nav>
+        <div class="session-chip"><span></span> 本地模式</div>
+      </header>
+
+      <main>
+        <section class="view is-active" id="train-view">
+          <div class="training-layout">
+            <section class="workspace-card">
+              <div class="mode-switch" role="tablist" aria-label="训练类型">
+                <button class="mode-tab is-active" role="tab" aria-selected="true" data-mode="interval">
+                  音程辨认
+                </button>
+                <button class="mode-tab" role="tab" aria-selected="false" data-mode="progression">
+                  和弦进行
+                </button>
+              </div>
+
+              <div class="training-tools">
+                <label>
+                  <span>难度</span>
+                  <select id="difficulty-select" aria-label="选择训练难度">
+                    <option value="foundation">基础</option>
+                    <option value="standard" selected>标准</option>
+                    <option value="advanced">进阶</option>
+                  </select>
+                </label>
+                <button class="ghost-button" id="restart-session">重新开始</button>
+              </div>
+
+              <div class="question-head">
+                <div>
+                  <p class="eyebrow" id="question-kicker">INTERVAL · 01</p>
+                  <h1 id="question-title">听辨这两个音的距离</h1>
+                  <p class="question-note" id="question-note">音符将依次播放，可随时重新聆听。</p>
+                </div>
+                <div class="question-count"><strong id="question-number">1</strong><span>/ 10</span></div>
+              </div>
+
+              <div class="sound-stage">
+                <div class="staff-lines" aria-hidden="true"></div>
+                <div class="wave" aria-hidden="true">
+                  <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                </div>
+                <button class="play-button" id="play-question" aria-label="播放题目">
+                  <span class="play-icon">▶</span>
+                </button>
+                <span class="keyboard-hint">空格键播放</span>
+              </div>
+
+              <div class="feedback-bar" id="feedback-bar" role="status" aria-live="polite">
+                <span class="feedback-icon">♪</span>
+                <span id="feedback-text">播放题目后选择答案</span>
+              </div>
+              <div class="answer-grid" id="answer-grid" aria-label="答案选项"></div>
+            </section>
+
+            <aside class="score-panel">
+              <div class="panel-heading">
+                <p class="eyebrow">LIVE SESSION</p>
+                <h2>本轮表现</h2>
+              </div>
+              <div class="score-ring" style="--score: 0">
+                <div><strong id="live-score">—</strong><span>当前得分</span></div>
+              </div>
+              <div class="metric-row">
+                <div><span>正确</span><strong id="correct-count">0</strong></div>
+                <div><span>连续</span><strong id="streak-count">0</strong></div>
+                <div><span>用时</span><strong id="timer">00:00</strong></div>
+              </div>
+              <div class="session-progress">
+                <div class="progress-copy"><span>本轮进度</span><strong id="progress-copy">0 / 10</strong></div>
+                <div class="progress-track"><i></i></div>
+              </div>
+              <p class="panel-tip">戴上耳机，在安静环境中会得到更稳定的训练结果。</p>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view data-view" id="history-view">
+          <div class="page-heading">
+            <div><p class="eyebrow">HISTORY</p><h1>训练历史</h1><p>每一次完成的测试都会保存在当前浏览器中。</p></div>
+            <div class="page-actions">
+              <select id="history-filter" aria-label="筛选训练类型">
+                <option value="all">全部训练</option><option value="interval">音程辨认</option><option value="progression">和弦进行</option>
+              </select>
+              <button class="ghost-button" id="export-history">导出记录</button>
+            </div>
+          </div>
+          <div class="summary-grid" id="history-summary"></div>
+          <section class="chart-card">
+            <div class="section-heading"><div><p class="eyebrow">PROGRESS</p><h2>准确率趋势</h2></div><span class="chart-legend"><i></i> 最近 12 次</span></div>
+            <div class="trend-chart" id="trend-chart" aria-label="准确率历史趋势图"></div>
+          </section>
+          <section class="records-card">
+            <div class="section-heading"><div><p class="eyebrow">SESSIONS</p><h2>测试记录</h2></div></div>
+            <div class="records-list" id="records-list"></div>
+          </section>
+        </section>
+        <section class="view data-view" id="report-view">
+          <div class="page-heading">
+            <div><p class="eyebrow">ABILITY REPORT</p><h1>综合能力报告</h1><p id="report-subtitle">根据全部历史测试动态生成。</p></div>
+            <button class="ghost-button" id="print-report">打印 / 保存 PDF</button>
+          </div>
+          <div class="report-layout">
+            <section class="ability-card">
+              <div class="ability-score" style="--score:0"><div><strong id="ability-score">—</strong><span>综合能力</span></div></div>
+              <div><p class="eyebrow">CURRENT LEVEL</p><h2 id="ability-level">等待首次测试</h2><p id="ability-summary">完成一轮训练后，这里会给出你的能力概览。</p></div>
+            </section>
+            <section class="skill-card">
+              <p class="eyebrow">SKILL PROFILE</p><h2>分项能力</h2>
+              <div class="skill-list" id="skill-list"></div>
+            </section>
+          </div>
+          <div class="report-stats" id="report-stats"></div>
+          <section class="insight-card">
+            <div><p class="eyebrow">NEXT STEP</p><h2>训练建议</h2></div>
+            <div class="insight-list" id="insight-list"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="session-dialog">
+      <button class="dialog-close" id="dialog-close" aria-label="关闭">×</button>
+      <p class="eyebrow">SESSION COMPLETE</p>
+      <h2>本轮训练完成</h2>
+      <div class="dialog-score"><strong id="dialog-score">0</strong><span>分</span></div>
+      <p id="dialog-summary"></p>
+      <div class="dialog-actions"><button class="primary-button" id="train-again">再练一轮</button><button class="ghost-button" id="view-report">查看报告</button></div>
+    </dialog>
+  </body>
+</html>
