@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="可深度配置的本地练耳训练工具，支持音程、和弦进行、离调内容与学习档案。" />
+    <meta name="description" content="本地练耳训练工具，支持两八度音程辨认、随机和声生成、常见进行热身与学习档案。" />
     <meta name="theme-color" content="#08151b" />
     <title>声阶 · Ear Training</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2308151b'/%3E%3Cpath d='M13 35h7l5-16 8 30 6-22 5 8h7' fill='none' stroke='%23c9ff55' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
@@ -12,7 +12,18 @@
       .app-shell{width:min(980px,100%)}
       .setup-layout{grid-template-columns:minmax(0,1fr) 260px}
       .test-layout{grid-template-columns:minmax(0,1fr) 240px}
+      .choice-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+      .choice-card{min-height:90px;padding:16px;text-align:left;border:1px solid rgba(141,164,171,.18);border-radius:14px;background:rgba(255,255,255,.025);color:inherit;cursor:pointer}
+      .choice-card strong,.choice-card small{display:block}.choice-card strong{font-size:15px}.choice-card small{margin-top:6px;color:#8da4ab;line-height:1.45}
+      .choice-card.is-selected{border-color:#c9ff55;background:rgba(201,255,85,.08);box-shadow:inset 0 0 0 1px rgba(201,255,85,.18)}
+      .fixed-start-panel{margin-top:18px;padding:18px;border:1px solid rgba(141,164,171,.14);border-radius:14px;background:rgba(0,0,0,.12)}
+      .fixed-start-panel .field-label:not(:first-child){margin-top:16px}
+      .warmup-note{padding:18px;border:1px solid rgba(201,255,85,.18);border-radius:14px;background:rgba(201,255,85,.06);color:#aebfc4;line-height:1.7}
+      .warmup-note strong{display:block;color:#edf6f3;margin-bottom:4px}
+      .harmony-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+      .harmony-list .check-option{min-height:68px}
       @media(max-width:850px){.setup-layout,.test-layout{grid-template-columns:1fr}}
+      @media(max-width:580px){.choice-cards,.harmony-list{grid-template-columns:1fr}}
     </style>
     <script src="./app.js" defer></script>
   </head>
@@ -28,7 +39,7 @@
           <div class="page-intro">
             <p class="eyebrow">BUILD YOUR SESSION</p>
             <h1>定制一场真正适合你的训练</h1>
-            <p>先确定训练材料、调性与音色，再进入考试。所有设置只影响下一轮训练。</p>
+            <p>音程与和弦使用两套独立训练逻辑。选好本轮范围与音色，再进入考试。</p>
           </div>
 
           <div class="setup-layout">
@@ -37,7 +48,7 @@
                 <div class="section-title"><span>01</span><div><h2>训练内容</h2><p>选择本轮主要考察的能力</p></div></div>
                 <div class="mode-cards" role="radiogroup" aria-label="训练内容">
                   <button class="mode-card is-selected" data-mode="interval" role="radio" aria-checked="true"><span class="mode-icon">↕</span><strong>音程辨认</strong><small>辨认两个音之间的距离</small></button>
-                  <button class="mode-card" data-mode="progression" role="radio" aria-checked="false"><span class="mode-icon">♬</span><strong>和弦进行</strong><small>辨认功能和声与常见进行</small></button>
+                  <button class="mode-card" data-mode="progression" role="radio" aria-checked="false"><span class="mode-icon">♬</span><strong>和弦进行</strong><small>随机生成和声或辨认常见进行</small></button>
                 </div>
               </section>
 
@@ -53,36 +64,53 @@
                 </div>
               </section>
 
+              <div id="interval-settings">
+                <section class="setup-section">
+                  <div class="section-title"><span>03</span><div><h2>起始音</h2><p>音程只比较两个音之间的距离，不引入调性</p></div></div>
+                  <div class="choice-cards" id="start-mode-options">
+                    <button class="choice-card is-selected" data-start-mode="random"><strong>系统随机起始音</strong><small>每题从舒适音域中随机选择，训练相对音高。</small></button>
+                    <button class="choice-card" data-start-mode="fixed"><strong>固定起始音</strong><small>用同一个参照音完成本轮，适合建立稳定锚点。</small></button>
+                  </div>
+                  <div class="fixed-start-panel is-hidden" id="fixed-start-panel">
+                    <p class="field-label">固定音名</p><div class="token-grid keys" id="fixed-note-options"></div>
+                    <p class="field-label">八度位置</p><div class="segmented" id="fixed-octave-options"><button data-octave="3">小字组 3</button><button class="is-selected" data-octave="4">中央组 4</button><button data-octave="5">高音组 5</button></div>
+                  </div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span>04</span><div><h2>音程范围</h2><p>从小二度到双八度，可精确选择本轮内容</p></div><strong class="selection-count" id="interval-count"></strong></div>
+                  <div class="token-grid intervals" id="interval-options"></div>
+                </section>
+              </div>
+
+              <div class="is-hidden" id="chord-settings">
+                <section class="setup-section">
+                  <div class="section-title"><span>03</span><div><h2>训练方式</h2><p>随机生成用于能力测试，常见进行用于快速热身</p></div></div>
+                  <div class="choice-cards" id="chord-mode-options">
+                    <button class="choice-card is-selected" data-chord-mode="generated"><strong>随机和声生成</strong><small>系统逐个生成和弦，你从相近答案中找出完整进行。</small></button>
+                    <button class="choice-card" data-chord-mode="warmup"><strong>常见进行热身</strong><small>集中辨认高频和声语汇，不混入随机组合。</small></button>
+                  </div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span>04</span><div><h2>调式</h2><p>每轮进入前必须选择大调或小调</p></div></div>
+                  <div class="segmented" id="tonality-options"><button class="is-selected" data-tonality="major">大调</button><button data-tonality="minor">小调</button></div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span>05</span><div><h2>调性中心</h2><p>可多选，题目会在所选主音上随机移调</p></div><strong class="selection-count" id="key-count">3 个调性</strong></div>
+                  <div class="token-grid keys" id="key-options" aria-label="选择调性中心"></div>
+                  <div class="micro-actions"><button id="select-all-keys">全部选择</button><button id="clear-keys">清空</button></div>
+                </section>
+                <section class="setup-section" id="generated-harmony-section">
+                  <div class="section-title"><span>06</span><div><h2>可加入的调外和声</h2><p>调内和弦始终可用；勾选后，系统会把这些和弦插入并导向合理解决</p></div><strong class="selection-count" id="chromatic-count"></strong></div>
+                  <div class="harmony-list" id="chromatic-harmony-options"></div>
+                </section>
+                <section class="setup-section is-hidden" id="warmup-explanation">
+                  <div class="section-title"><span>06</span><div><h2>热身题库</h2><p>无需选择具体进行，系统会轮换该调式下的高频语汇</p></div></div>
+                  <div class="warmup-note"><strong>只练常见完整进行</strong>本模式从流行、古典与爵士语汇中抽取常见进行；不会混入随机调内或调外和弦。</div>
+                </section>
+              </div>
+
               <section class="setup-section">
-                <div class="section-title"><span>03</span><div><h2>调性范围</h2><p>可多选，题目会在所选调性中随机出现</p></div><strong class="selection-count" id="key-count">3 个调性</strong></div>
-                <div class="token-grid keys" id="key-options" aria-label="选择调性"></div>
-                <div class="micro-actions"><button id="select-all-keys">全部选择</button><button id="clear-keys">清空</button></div>
-              </section>
-
-              <section class="setup-section" id="interval-content-section">
-                <div class="section-title"><span>04</span><div><h2>音程范围</h2><p>精确选择会出现在答案中的音程</p></div><strong class="selection-count" id="interval-count"></strong></div>
-                <div class="token-grid intervals" id="interval-options"></div>
-                <div class="sub-setting" style="margin-top:20px;padding-top:18px;border-top:1px solid rgba(141,164,171,.12)">
-                  <p class="field-label">音阶 / 调式内容 <small>起始音从所选音阶中取样</small></p>
-                  <div class="token-grid" id="scale-options"></div>
-                </div>
-              </section>
-
-              <section class="setup-section is-hidden" id="progression-content-section">
-                <div class="section-title"><span>04</span><div><h2>和弦进行范围</h2><p>选择希望训练的功能进行</p></div><strong class="selection-count" id="progression-count"></strong></div>
-                <div class="check-list" id="progression-options"></div>
-              </section>
-
-              <section class="setup-section">
-                <div class="section-title has-control"><span>05</span><div><h2>离调内容</h2><p id="chromatic-description">允许起始音来自调外音级</p></div><label class="switch"><input type="checkbox" id="allow-chromatic" /><i></i><b>允许</b></label></div>
-                <div class="chromatic-options is-hidden" id="chromatic-options">
-                  <div id="chromatic-note-panel"><p class="field-label">可用的调外音级</p><div class="token-grid compact" id="chromatic-note-options"></div></div>
-                  <div class="is-hidden" id="borrowed-chord-panel"><p class="field-label">可用的借用和弦进行</p><div class="check-list" id="borrowed-chord-options"></div></div>
-                </div>
-              </section>
-
-              <section class="setup-section">
-                <div class="section-title"><span>06</span><div><h2>演奏音色</h2><p>不同音色会改变泛音与起音特征</p></div></div>
+                <div class="section-title"><span id="instrument-step">05</span><div><h2>演奏音色</h2><p>不同音色会改变泛音与起音特征</p></div></div>
                 <div class="instrument-grid" id="instrument-options">
                   <button class="instrument-card is-selected" data-instrument="piano"><span>♩</span><strong>钢琴</strong><small>清晰、均衡</small></button>
                   <button class="instrument-card" data-instrument="guitar"><span>⌁</span><strong>吉他</strong><small>短促、温暖</small></button>
