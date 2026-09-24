@@ -222,7 +222,7 @@ function progressionChoices(correct,session){
 function intervalQuestion(session){
   const items=intervalBank.filter(item=>session.intervals.includes(item.id));
   const item=randomItem(items,state.lastQuestionId);state.lastQuestionId=item.id;
-  const choices=shuffle([item,...shuffle(items.filter(option=>option.id!==item.id)).slice(0,7)]).map(option=>({id:option.id,name:option.name}));
+  const choices=items.map(option=>({id:option.id,name:option.name}));
   const rootMidi=session.startMode==='fixed'?12*(session.fixedOctave+1)+session.fixedPitch:48+Math.floor(Math.random()*20);
   return {...item,rootMidi,choiceOptions:choices,keyName:null,usedChromatic:false};
 }
@@ -271,9 +271,10 @@ function renderQuestion(){
   const interval=state.sessionConfig.mode==='interval';
   $('#question-kicker').textContent=`${interval?'INTERVAL':'CHORD PROGRESSION'} · ${String(state.index+1).padStart(2,'0')}`;
   $('#question-title').textContent=interval?'听辨这两个音的距离':state.sessionConfig.chordMode==='warmup'?'识别这段常见和弦进行':'找出最符合音响的和声进行';
-  $('#question-note').textContent=interval?`${state.sessionConfig.startMode==='random'?'起始音每题随机':'本轮使用固定起始音'} · 最远覆盖两个八度 · ${instrumentNames[state.sessionConfig.instrument]}音色`:`${tonalityNames[state.sessionConfig.tonality]} · 从 ${state.sessionConfig.keys.length} 个调性中心随机移调 · ${instrumentNames[state.sessionConfig.instrument]}音色`;
+  $('#question-note').textContent=interval?`${state.sessionConfig.startMode==='random'?'起始音每题随机':'本轮使用固定起始音'} · ${state.sessionConfig.intervals.length} 个音程按距离排列 · ${instrumentNames[state.sessionConfig.instrument]}音色`:`${tonalityNames[state.sessionConfig.tonality]} · 从 ${state.sessionConfig.keys.length} 个调性中心随机移调 · ${instrumentNames[state.sessionConfig.instrument]}音色`;
   $('#question-number').textContent=String(state.index+1);$('#question-total').textContent=`/ ${state.sessionConfig.questionCount}`;
-  $('#answer-grid').innerHTML=state.question.choiceOptions.map((option,index)=>`<button data-answer="${option.id}"><span>${option.name}${option.subtitle?`<small>${option.subtitle}</small>`:''}</span><kbd>${index+1}</kbd></button>`).join('');
+  $('#answer-grid').classList.toggle('is-interval',interval);
+  $('#answer-grid').innerHTML=state.question.choiceOptions.map((option,index)=>`<button data-answer="${option.id}"><span>${option.name}${option.subtitle?`<small>${option.subtitle}</small>`:''}</span>${interval?'':`<kbd>${index+1}</kbd>`}</button>`).join('');
   $$('#answer-grid button').forEach(button=>button.addEventListener('click',()=>submitAnswer(button.dataset.answer,button)));
 }
 

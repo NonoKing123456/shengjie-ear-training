@@ -25,7 +25,11 @@
       .soundfont-status{display:flex;align-items:center;gap:8px;margin:12px 0 0;color:#8da4ab;font-size:.75rem;line-height:1.5}
       .soundfont-status i{width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#4dd8d2;box-shadow:0 0 0 4px rgba(77,216,210,.08)}
       .soundfont-status.is-loading i{animation:pulse 1s infinite;background:#c9ff55}.soundfont-status.is-error{color:#ff9a89}.soundfont-status.is-error i{background:#ff7a66}
+      .answer-grid.is-interval{grid-template-columns:repeat(4,minmax(0,1fr))}
+      .answer-grid.is-interval button{justify-content:center;min-height:44px;padding:8px;text-align:center;font-size:.78rem}
+      .answer-grid.is-interval kbd{display:none}
       @media(max-width:850px){.setup-layout,.test-layout{grid-template-columns:1fr}}
+      @media(max-width:600px){.answer-grid.is-interval{grid-template-columns:repeat(2,minmax(0,1fr))}}
       @media(max-width:580px){.choice-cards,.harmony-list{grid-template-columns:1fr}}
     </style>
     <script src="./vendor/webaudiofont/WebAudioFontPlayer.js" defer></script>
