@@ -79,13 +79,13 @@ const tonalityNames = { major:'大调', minor:'小调' };
 const chordModeNames = { generated:'随机和声', warmup:'常见进行热身' };
 const intervalDirectionNames = { ascending:'上行', descending:'下行', mixed:'交替出现' };
 const soundfontPresets = {
-  piano:()=>window._tone_0000_FluidR3_GM_sf2_file,
+  piano:()=>window._tone_0000_SalamanderGrandPiano,
   guitar:()=>window._tone_0250_FluidR3_GM_sf2_file,
   sax:()=>window._tone_0650_FluidR3_GM_sf2_file,
   violin:()=>window._tone_0400_FluidR3_GM_sf2_file
 };
 const soundfontPlayback = {
-  piano:{singleVolume:.58,chordVolume:.2,noteDuration:1.05,chordDuration:.78,strum:0},
+  piano:{singleVolume:.7,chordVolume:.22,noteDuration:1.35,chordDuration:1.12,strum:0},
   guitar:{singleVolume:.64,chordVolume:.24,noteDuration:.95,chordDuration:.72,strum:.022},
   sax:{singleVolume:.46,chordVolume:.16,noteDuration:1.05,chordDuration:.78,strum:0},
   violin:{singleVolume:.42,chordVolume:.15,noteDuration:1.1,chordDuration:.82,strum:0}
@@ -330,9 +330,14 @@ async function prepareInstrument(instrument){
   }
   if(!state.soundfontPromises[instrument]){
     const preset=soundfontPresets[instrument]?.();
-    if(!window.WebAudioFontPlayer||!preset)throw new Error(`缺少 ${instrumentNames[instrument]} SoundFont 资源`);
+    if(!preset||(instrument==='piano'?!window.GrandPianoSampler:!window.WebAudioFontPlayer))throw new Error(`缺少 ${instrumentNames[instrument]}采样资源`);
     setSoundfontStatus('loading',`正在解码${instrumentNames[instrument]}真实采样…`);
-    state.soundfontPromises[instrument]=window.WebAudioFontPlayer.load(preset,ctx,state.audioBus).then(player=>{
+    const loading=instrument==='piano'?(async()=>{
+      const sampler=new window.GrandPianoSampler(preset,ctx,state.audioBus);
+      await sampler.prepare([60]);
+      return sampler;
+    })():window.WebAudioFontPlayer.load(preset,ctx,state.audioBus);
+    state.soundfontPromises[instrument]=loading.then(player=>{
       state.soundfontPlayers[instrument]=player;
       if(config.instrument===instrument)setSoundfontStatus('ready',`${instrumentNames[instrument]}真实采样已就绪，可离线播放。`);
       return player;
@@ -395,16 +400,19 @@ async function startPlayback(type,group='correct',noteIndex=0){
   const question=state.question,session=state.sessionConfig,settings=soundfontPlayback[session.instrument];
   const play=$('#play-question');if(!state.locked)play.disabled=true;
   playbackStatus(`正在准备${instrumentNames[session.instrument]}音色…`);
+  const selected=intervalBank.find(item=>item.id===state.selectedAnswer);
+  const correctNotes=[question.rootMidi,question.targetMidi];
+  const mineNotes=[question.rootMidi,question.rootMidi+question.direction*(selected?.semitones??question.semitones)];
+  const neededPitches=session.mode==='interval'?
+    (type==='ab'?[...mineNotes,...correctNotes]:type==='mine'||type==='single'&&group==='mine'?mineNotes:correctNotes):
+    question.chords.flatMap(notes=>notes.map(note=>question.rootMidi+note));
   let player,ctx,usedFallback=false;
-  try{ctx=await getAudioContext();player=await prepareInstrument(session.instrument);await player.cancelQueue()}
+  try{ctx=await getAudioContext();player=await prepareInstrument(session.instrument);await player.cancelQueue();if(player.prepare)await player.prepare(neededPitches)}
   catch(error){console.warn('SoundFont playback unavailable, using fallback synth.',error);ctx=await getAudioContext();usedFallback=true}
   if(token!==state.playbackToken||question!==state.question)return;
   if(usedFallback){state.fallbackOutput=ctx.createGain();state.fallbackOutput.connect(state.audioBus.input)}
   const now=ctx.currentTime+.07,simultaneous=session.intervalPlayback==='simultaneous';
   const clipLength=(simultaneous?0:.92)+settings.noteDuration;
-  const selected=intervalBank.find(item=>item.id===state.selectedAnswer);
-  const correctNotes=[question.rootMidi,question.targetMidi];
-  const mineNotes=[question.rootMidi,question.rootMidi+question.direction*(selected?.semitones??question.semitones)];
   const playNote=(midi,offset,duration,volume)=>{
     if(usedFallback)fallbackSynthTone(ctx,midi,now+offset,duration,Math.min(.16,volume*.27));
     else player.queueWaveTable(now+offset,midi,duration,volume);

@@ -16,7 +16,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## FluidR3 SoundFont samples
 
-The bundled acoustic grand piano, steel acoustic guitar, alto saxophone and violin presets were converted from FluidR3 GM SoundFont data distributed by the WebAudioFont data project.
+The bundled steel acoustic guitar, alto saxophone and violin presets were converted from FluidR3 GM SoundFont data distributed by the WebAudioFont data project.
 
 FluidR3 original version by Frank Wen, Copyright (c) 2000-2002, 2008.
 
@@ -29,3 +29,15 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 WebAudioFont data conversion project: https://github.com/surikov/webaudiofontdata
+
+## Salamander Grand Piano V3 samples
+
+The bundled piano uses recordings of a Yamaha C5 grand piano by Alexander Holm (Salamander Grand Piano V3). The velocity-8 MP3 samples were obtained from `@audio-samples/piano-mp3-velocity8` version 1.0.5 and embedded as base64 in `dist/assets/soundfonts/piano.js` for offline playback. The audio itself has not been edited.
+
+Original source: https://archive.org/details/SalamanderGrandPianoV3
+
+MP3 distribution: https://github.com/darosh/samples-piano-mp3
+
+Licensed under Creative Commons Attribution 3.0 Unported: https://creativecommons.org/licenses/by/3.0/
+
+Author: Alexander Holm. This project is not endorsed by the author.
