@@ -152,10 +152,7 @@ function setDifficulty(value){
 }
 
 function setIntervalDirection(value){
-  const current=config.intervalDirection;
-  if(value==='mixed')config.intervalDirection='mixed';
-  else if(current==='mixed'||current===value)config.intervalDirection=value;
-  else config.intervalDirection='mixed';
+  config.intervalDirection=value;
   syncConfigUI();
 }
 
