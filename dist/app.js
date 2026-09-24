@@ -106,6 +106,7 @@ const state = {
   sessionConfig:null, question:null, lastQuestionId:null, index:0, correct:0, streak:0,
   maxStreak:0, answers:[], startedAt:null, questionStartedAt:null, locked:false,
   timerId:null, audioContext:null, audioBus:null, audioBusy:false,
+  selectedAnswer:null, playbackToken:0, playbackTimers:[], fallbackOutput:null,
   soundfontPlayers:{}, soundfontPromises:{}
 };
 
@@ -272,14 +273,14 @@ function startSession(){
 function resetSessionState(){
   clearInterval(state.timerId);
   cancelSamplePlayback();
-  Object.assign(state,{question:null,lastQuestionId:null,index:0,correct:0,streak:0,maxStreak:0,answers:[],startedAt:null,questionStartedAt:null,locked:false,timerId:null,audioBusy:false});
+  Object.assign(state,{question:null,lastQuestionId:null,index:0,correct:0,streak:0,maxStreak:0,answers:[],startedAt:null,questionStartedAt:null,locked:false,timerId:null,audioBusy:false,selectedAnswer:null});
   $('#timer').textContent='00:00';$('#feedback-bar').className='feedback-bar';$('#feedback-text').textContent='播放题目后选择答案';
 }
 
 function restartSession(){resetSessionState();newQuestion();renderSessionTags();updateLiveStats()}
 
 function newQuestion(){
-  cancelSamplePlayback();state.audioBusy=false;state.locked=false;state.question=state.sessionConfig.mode==='interval'?intervalQuestion(state.sessionConfig):chordQuestion(state.sessionConfig);
+  cancelSamplePlayback();state.audioBusy=false;state.locked=false;state.selectedAnswer=null;state.question=state.sessionConfig.mode==='interval'?intervalQuestion(state.sessionConfig):chordQuestion(state.sessionConfig);
   state.questionStartedAt=Date.now();renderQuestion();
 }
 
@@ -292,6 +293,7 @@ function renderSessionTags(){
 
 function renderQuestion(){
   const interval=state.sessionConfig.mode==='interval';
+  $('#sound-stage').classList.remove('is-review');$('#stage-prompt').classList.remove('is-hidden');$('#review-content').classList.add('is-hidden');$('#review-content').innerHTML='';
   $('#question-kicker').textContent=`${interval?'INTERVAL':'CHORD PROGRESSION'} · ${String(state.index+1).padStart(2,'0')}`;
   $('#question-title').textContent=interval?'听辨这两个音的距离':state.sessionConfig.chordMode==='warmup'?'识别这段常见和弦进行':'找出最符合音响的和声进行';
   const directionNote=state.sessionConfig.intervalPlayback==='simultaneous'?'无方向':state.sessionConfig.intervalDirection==='mixed'?'上行或下行随机':intervalDirectionNames[state.sessionConfig.intervalDirection];
@@ -344,10 +346,15 @@ async function prepareInstrument(instrument){
 }
 
 function cancelSamplePlayback(){
+  state.playbackToken++;
+  state.playbackTimers.forEach(clearTimeout);state.playbackTimers=[];
   Object.values(state.soundfontPlayers).forEach(player=>player.cancelQueue().catch(()=>{}));
+  if(state.fallbackOutput){state.fallbackOutput.gain.value=0;state.fallbackOutput.disconnect();state.fallbackOutput=null}
+  $$('.review-zone.is-playing,.score-note.is-playing').forEach(node=>node.classList.remove('is-playing'));
   const play=$('#play-question');const wave=$('.wave');
   if(play){play.disabled=false;play.classList.remove('is-playing');play.querySelector('span').textContent='▶'}
   if(wave)wave.classList.remove('is-playing');
+  state.audioBusy=false;
 }
 
 function midiToHz(midi){return 440*(2**((midi-69)/12))}
@@ -364,56 +371,109 @@ function fallbackSynthTone(ctx,midi,start,duration,volume=.12){
   master.gain.setValueAtTime(.0001,start);master.gain.exponentialRampToValueAtTime(volume,start+preset.attack);
   if(instrument==='piano'||instrument==='guitar')master.gain.exponentialRampToValueAtTime(Math.max(.012,volume*.28),start+duration*.58);
   else master.gain.setValueAtTime(volume,start+duration*.72);
-  master.gain.exponentialRampToValueAtTime(.0001,start+duration*preset.release);master.connect(ctx.destination);
+  master.gain.exponentialRampToValueAtTime(.0001,start+duration*preset.release);master.connect(state.fallbackOutput||ctx.destination);
   preset.types.forEach((type,index)=>{const osc=ctx.createOscillator();osc.type=type;osc.frequency.value=midiToHz(midi);osc.detune.value=preset.detune[index];const mix=ctx.createGain();mix.gain.value=index ? .26 : .74;osc.connect(mix).connect(master);osc.start(start);osc.stop(start+duration+.04)});
 }
 
 async function playQuestion(){
-  if(!state.question||state.locked||state.audioBusy)return;ensureSessionStarted();state.audioBusy=true;
-  const question=state.question;const session=state.sessionConfig;const play=$('#play-question');const wave=$('.wave');
-  play.disabled=true;$('#feedback-text').textContent=`正在准备${instrumentNames[session.instrument]}真实采样…`;
-  let player;let ctx;let usedFallback=false;
+  return startPlayback('question');
+}
+
+function playbackStatus(text){
+  const status=$('#review-playback-status');if(status)status.textContent=text;
+  else $('#feedback-text').textContent=text;
+}
+
+function queueVisual(token,delay,callback){
+  state.playbackTimers.push(setTimeout(()=>{if(token===state.playbackToken)callback()},Math.max(0,delay*1000)));
+}
+
+async function startPlayback(type,group='correct',noteIndex=0){
+  if(!state.question||!state.sessionConfig)return;
+  if(!state.locked&&type!=='question')return;
+  ensureSessionStarted();cancelSamplePlayback();const token=state.playbackToken;state.audioBusy=true;
+  const question=state.question,session=state.sessionConfig,settings=soundfontPlayback[session.instrument];
+  const play=$('#play-question');if(!state.locked)play.disabled=true;
+  playbackStatus(`正在准备${instrumentNames[session.instrument]}音色…`);
+  let player,ctx,usedFallback=false;
   try{ctx=await getAudioContext();player=await prepareInstrument(session.instrument);await player.cancelQueue()}
   catch(error){console.warn('SoundFont playback unavailable, using fallback synth.',error);ctx=await getAudioContext();usedFallback=true}
-  if(question!==state.question){state.audioBusy=false;play.disabled=false;return}
-  play.classList.add('is-playing');wave.classList.add('is-playing');play.querySelector('span').textContent='■';
-  $('#feedback-text').textContent=usedFallback?'采样暂不可用，正在使用备用音色':'正在播放真实乐器采样';
-  const settings=soundfontPlayback[session.instrument];const now=ctx.currentTime+.05;let animationMs;
-  if(session.mode==='interval'){
-    const simultaneous=session.intervalPlayback==='simultaneous';const targetStart=simultaneous?now:now+.92;const volume=simultaneous?settings.singleVolume*.82:settings.singleVolume;
-    if(usedFallback){fallbackSynthTone(ctx,question.rootMidi,now,.76,simultaneous?.12:.15);fallbackSynthTone(ctx,question.targetMidi,targetStart,.82,simultaneous?.12:.15)}
-    else{player.queueWaveTable(now,question.rootMidi,settings.noteDuration,volume);player.queueWaveTable(targetStart,question.targetMidi,settings.noteDuration,volume)}
-    animationMs=simultaneous?1450:2150;
-  }else{
-    question.chords.forEach((notes,chordIndex)=>{
-      const chordStart=now+chordIndex*.9;
-      notes.forEach((note,noteIndex)=>{
-        const start=chordStart+noteIndex*settings.strum;const midi=question.rootMidi+note;
-        if(usedFallback)fallbackSynthTone(ctx,midi,start,settings.chordDuration,.062);
-        else player.queueWaveTable(start,midi,settings.chordDuration,settings.chordVolume);
-      });
+  if(token!==state.playbackToken||question!==state.question)return;
+  if(usedFallback){state.fallbackOutput=ctx.createGain();state.fallbackOutput.connect(state.audioBus.input)}
+  const now=ctx.currentTime+.07,simultaneous=session.intervalPlayback==='simultaneous';
+  const clipLength=(simultaneous?0:.92)+settings.noteDuration;
+  const selected=intervalBank.find(item=>item.id===state.selectedAnswer);
+  const correctNotes=[question.rootMidi,question.targetMidi];
+  const mineNotes=[question.rootMidi,question.rootMidi+question.direction*(selected?.semitones??question.semitones)];
+  const playNote=(midi,offset,duration,volume)=>{
+    if(usedFallback)fallbackSynthTone(ctx,midi,now+offset,duration,Math.min(.16,volume*.27));
+    else player.queueWaveTable(now+offset,midi,duration,volume);
+  };
+  const mark=(zone,index,offset,duration,label)=>{
+    queueVisual(token,offset,()=>{
+      $$('.review-zone.is-playing').filter(node=>node.dataset.zone!==zone).forEach(node=>node.classList.remove('is-playing'));
+      $$('.score-note.is-playing').filter(node=>node.dataset.zone!==zone).forEach(node=>node.classList.remove('is-playing'));
+      const region=document.querySelector(`.review-zone[data-zone="${zone}"]`);
+      region?.classList.add('is-playing');
+      region?.querySelector(`.score-note[data-note="${index}"]`)?.classList.add('is-playing');
+      playbackStatus(`正在听：${label}${simultaneous&&type!=='single'?'':` · 第 ${index+1} 个音`}`);
     });
-    animationMs=question.chords.length*900+160;
+    queueVisual(token,offset+duration,()=>regionClear(zone,index));
+  };
+  function regionClear(zone,index){const region=document.querySelector(`.review-zone[data-zone="${zone}"]`);region?.querySelector(`.score-note[data-note="${index}"]`)?.classList.remove('is-playing')}
+  const playPair=(notes,offset,zone,label)=>{
+    notes.forEach((midi,index)=>{
+      const onset=offset+(simultaneous?0:index*.92);
+      playNote(midi,onset,settings.noteDuration,settings.singleVolume*(simultaneous?.82:1));
+      if(state.locked)mark(zone,index,onset,settings.noteDuration,label);
+    });
+  };
+  let duration;
+  if(session.mode==='interval'){
+    if(type==='single'){
+      const notes=group==='mine'?mineNotes:correctNotes;
+      playNote(notes[noteIndex],0,settings.noteDuration,settings.singleVolume);
+      mark(group,noteIndex,0,settings.noteDuration,group==='mine'?'我的答案':'正确答案');duration=1.3;
+    }else if(type==='ab'){
+      playPair(mineNotes,0,'mine','我的答案');
+      playPair(correctNotes,clipLength+.8,'correct','正确答案');
+      duration=clipLength*2+.8;
+    }else{
+      const zone=type==='mine'?'mine':'correct';
+      playPair(type==='mine'?mineNotes:correctNotes,0,zone,type==='mine'?'我的答案':type==='question'?'原题':'正确答案');
+      duration=clipLength;
+    }
+  }else{
+    question.chords.forEach((notes,chordIndex)=>notes.forEach((note,noteIndex)=>playNote(question.rootMidi+note,chordIndex*.9+noteIndex*settings.strum,settings.chordDuration,settings.chordVolume)));
+    duration=question.chords.length*.9+.2;
   }
-  setTimeout(stopAnimation,animationMs);
-  function stopAnimation(){
-    if(question!==state.question)return;
-    state.audioBusy=false;play.disabled=false;play.classList.remove('is-playing');wave.classList.remove('is-playing');play.querySelector('span').textContent='▶';
-    if(!state.locked)$('#feedback-text').textContent='请选择答案';
-  }
+  if(!state.locked){play.classList.add('is-playing');$('.wave').classList.add('is-playing');play.querySelector('span').textContent='■';playbackStatus(usedFallback?'正在播放备用音色':'正在播放题目')}
+  else if(session.mode!=='interval')playbackStatus('正在重听题目');
+  queueVisual(token,duration,()=>{
+    state.audioBusy=false;play.disabled=false;play.classList.remove('is-playing');$('.wave').classList.remove('is-playing');play.querySelector('span').textContent='▶';
+    $$('.review-zone.is-playing,.score-note.is-playing').forEach(node=>node.classList.remove('is-playing'));
+    if(state.locked)playbackStatus('可再次试听，准备好后进入下一题');else playbackStatus('请选择答案');
+  });
 }
 
 function ensureSessionStarted(){if(state.startedAt)return;state.startedAt=Date.now();state.questionStartedAt=Date.now();state.timerId=setInterval(updateTimer,1000)}
 
 function submitAnswer(answerId,button){
   if(state.locked||!state.question)return;ensureSessionStarted();state.locked=true;
+  state.selectedAnswer=answerId;cancelSamplePlayback();
   const correct=answerId===state.question.id;const elapsed=Date.now()-state.questionStartedAt;
   if(correct)state.correct++;state.streak=correct?state.streak+1:0;state.maxStreak=Math.max(state.maxStreak,state.streak);
   state.answers.push({question:state.question.id,answer:answerId,correct,elapsed,key:state.question.keyName,chromatic:Boolean(state.question.usedChromatic)});
   $$('#answer-grid button').forEach(item=>{item.disabled=true;if(item.dataset.answer===state.question.id)item.classList.add('correct')});
   if(!correct)button.classList.add('wrong');
-  $('#feedback-bar').className=`feedback-bar ${correct?'is-correct':'is-wrong'}`;$('#feedback-text').textContent=correct?`正确 · ${state.question.name}`:`答案是 ${state.question.name}`;updateLiveStats();
-  setTimeout(()=>{state.index++;if(state.index>=state.sessionConfig.questionCount)finishSession();else{$('#feedback-bar').className='feedback-bar';$('#feedback-text').textContent='下一题已准备好';newQuestion();updateLiveStats()}},1000);
+  $('#feedback-bar').className=`feedback-bar ${correct?'is-correct':'is-wrong'}`;$('#feedback-text').textContent=correct?`正确 · ${state.question.name}`:`答案是 ${state.question.name}`;updateLiveStats();renderReview(correct);
+}
+
+function nextQuestion(){
+  if(!state.locked)return;
+  cancelSamplePlayback();state.index++;
+  if(state.index>=state.sessionConfig.questionCount){finishSession();return}
+  $('#feedback-bar').className='feedback-bar';$('#feedback-text').textContent='播放题目后选择答案';newQuestion();updateLiveStats();
 }
 
 function updateTimer(){if(!state.startedAt)return;const seconds=Math.floor((Date.now()-state.startedAt)/1000);$('#timer').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}
@@ -443,7 +503,7 @@ function finishSession(){
   $('#session-dialog').showModal();
 }
 
-function switchView(name){$$('.view').forEach(view=>view.classList.toggle('is-active',view.id===`${name}-view`));if(name==='progress')renderProgress();window.scrollTo({top:0,behavior:'smooth'})}
+function switchView(name){if(name!=='train')cancelSamplePlayback();$$('.view').forEach(view=>view.classList.toggle('is-active',view.id===`${name}-view`));if(name==='progress')renderProgress();window.scrollTo({top:0,behavior:'smooth'})}
 function formatDate(iso){return new Intl.DateTimeFormat('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(iso))}
 function formatDuration(seconds){return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`}
 
@@ -510,7 +570,14 @@ function bindEvents(){
   $('#play-question').addEventListener('click',playQuestion);$('#restart-session').addEventListener('click',restartSession);$('#history-filter').addEventListener('change',renderRecords);$('#print-report').addEventListener('click',()=>window.print());
   $('#dialog-close').addEventListener('click',()=>$('#session-dialog').close());$('#train-again').addEventListener('click',()=>{$('#session-dialog').close();restartSession()});$('#view-progress').addEventListener('click',()=>{$('#session-dialog').close();switchView('progress')});
   $('#export-history').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),sessions:historyData()},null,2)],{type:'application/json'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`shengjie-history-${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(link.href)});
-  document.addEventListener('keydown',event=>{if(!$('#train-view').classList.contains('is-active')||$('#session-dialog').open)return;if(event.code==='Space'){event.preventDefault();playQuestion();return}const index=Number(event.key)-1;const buttons=$$('#answer-grid button');if(index>=0&&index<buttons.length)buttons[index].click()});
+  document.addEventListener('keydown',event=>{
+    if(!$('#train-view').classList.contains('is-active')||$('#session-dialog').open)return;
+    if(event.target.closest('#review-content button,select,input,textarea,[role="button"]')&&event.code!=='Space')return;
+    if(event.code==='Space'){event.preventDefault();playQuestion();return}
+    if(state.locked&&(event.code==='Enter'||event.code==='ArrowRight')){event.preventDefault();nextQuestion();return}
+    if(state.locked)return;
+    const index=Number(event.key)-1;const buttons=$$('#answer-grid button');if(index>=0&&index<buttons.length)buttons[index].click()
+  });
 }
 
 renderOptionControls();bindEvents();syncConfigUI();renderProgress();registerWebMCPTools();

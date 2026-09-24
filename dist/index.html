@@ -45,6 +45,7 @@
     <script src="./assets/soundfonts/sax.js" defer></script>
     <script src="./assets/soundfonts/violin.js" defer></script>
     <script src="./app.js" defer></script>
+    <script src="./review.js" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -188,7 +189,7 @@
           <div class="test-layout">
             <section class="question-card">
               <div class="question-head"><div><p class="eyebrow" id="question-kicker"></p><h1 id="question-title"></h1><p id="question-note"></p></div><div class="question-count"><strong id="question-number">1</strong><span id="question-total">/ 10</span></div></div>
-              <div class="sound-stage"><div class="staff-lines"></div><div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><button class="play-button" id="play-question" aria-label="播放题目"><span>▶</span></button><small>空格键播放</small></div>
+              <div class="sound-stage" id="sound-stage"><div class="stage-prompt" id="stage-prompt"><div class="staff-lines"></div><div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><button class="play-button" id="play-question" aria-label="播放题目"><span>▶</span></button><small>空格键播放</small></div><div class="review-content is-hidden" id="review-content"></div></div>
               <div class="feedback-bar" id="feedback-bar" role="status" aria-live="polite"><span>♪</span><b id="feedback-text">播放题目后选择答案</b></div>
               <div class="answer-grid" id="answer-grid"></div>
             </section>
