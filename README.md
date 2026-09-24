@@ -20,6 +20,10 @@ py -m http.server 4173 -d dist
 - 音程答题后在同一音频 Panel 查看真实五线谱；答错时上下对照正确答案与所选音程，支持单音、整组、原题及 AB 试听，手动进入下一题
 - 和弦进行：每轮选择大调或小调及调性中心，由系统逐个和弦生成完整题目
 - 常见进行热身：直接轮换高频大调/小调进行，不混入随机和声
+
+- 传统爵士：独立选择大调/小调、基础/进阶/高级语汇包、调性中心与 Shell/训练型/Rootless 配位；基于功能连接生成 3–4 和弦题目和相近选项
+
+- 爵士进行按整段优化声部连接，答后在同一 Panel 比较正确与所选进行的实际五线谱配位，支持单个和弦、整段与 AB 试听；学习档案分别统计大调、小调、语汇包和常见混淆
 - 可手动加入三级属、重属、降二级属、那不勒斯六和弦、德国增六和弦等调外和声
 - 三档难度与 10/15/20 题配置；难度会调整音程预设与答案干扰项数量
 - 钢琴采用 Salamander Grand Piano 的 Yamaha C5 实录采样；吉他、萨克斯和小提琴使用 FluidR3 采样
@@ -40,8 +44,10 @@ dist/
   index.html   页面结构
   styles.css  视觉样式与响应式布局
   app.js      训练逻辑、音频、记录与报告
+  jazz.js     传统爵士和声语法、题目与配位生成
+  jazz-notation.js  爵士配位五线谱渲染
   piano-sampler.js  钢琴采样按需解码与播放
-  assets/soundfonts/  四种本地 FluidR3 乐器采样
+  assets/soundfonts/  Salamander 钢琴与三种 FluidR3 乐器采样
   vendor/webaudiofont/  SoundFont 浏览器播放器
 ```
 

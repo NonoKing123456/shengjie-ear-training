@@ -45,6 +45,8 @@
     <script src="./assets/soundfonts/sax.js" defer></script>
     <script src="./assets/soundfonts/violin.js" defer></script>
     <script src="./piano-sampler.js" defer></script>
+    <script src="./jazz.js" defer></script>
+    <script src="./jazz-notation.js" defer></script>
     <script src="./app.js" defer></script>
     <script src="./review.js" defer></script>
   </head>
@@ -60,7 +62,7 @@
           <div class="page-intro">
             <p class="eyebrow">BUILD YOUR SESSION</p>
             <h1>定制一场真正适合你的训练</h1>
-            <p>音程与和弦使用两套独立训练逻辑。选好本轮范围与音色，再进入考试。</p>
+            <p>音程、综合和弦与传统爵士各有独立训练逻辑。选好本轮范围与音色，再进入训练。</p>
           </div>
 
           <div class="setup-layout">
@@ -69,12 +71,13 @@
                 <div class="section-title"><span>01</span><div><h2>训练内容</h2><p>选择本轮主要考察的能力</p></div></div>
                 <div class="mode-cards" role="radiogroup" aria-label="训练内容">
                   <button class="mode-card is-selected" data-mode="interval" role="radio" aria-checked="true"><span class="mode-icon">↕</span><strong>音程辨认</strong><small>辨认两个音之间的距离</small></button>
-                  <button class="mode-card" data-mode="progression" role="radio" aria-checked="false"><span class="mode-icon">♬</span><strong>和弦进行</strong><small>随机生成和声或辨认常见进行</small></button>
+                  <button class="mode-card" data-mode="progression" role="radio" aria-checked="false"><span class="mode-icon">♬</span><strong>综合和弦</strong><small>现有和声生成与常见进行热身</small></button>
+                  <button class="mode-card" data-mode="jazz" role="radio" aria-checked="false"><span class="mode-icon">♫</span><strong>传统爵士</strong><small>功能进行、七和弦与连续声部</small></button>
                 </div>
               </section>
 
               <section class="setup-section">
-                <div class="section-title"><span>02</span><div><h2>难度与题量</h2><p>难度会为训练内容应用一组推荐预设</p></div></div>
+                <div class="section-title"><span>02</span><div><h2 id="difficulty-section-title">难度与题量</h2><p id="difficulty-section-help">难度会为训练内容应用一组推荐预设</p></div></div>
                 <div class="inline-setting">
                   <div class="segmented" id="difficulty-options">
                     <button data-difficulty="foundation">基础</button><button class="is-selected" data-difficulty="standard">标准</button><button data-difficulty="advanced">进阶</button>
@@ -157,6 +160,34 @@
                 </section>
               </div>
 
+              <div class="is-hidden" id="jazz-settings">
+                <section class="setup-section">
+                  <div class="section-title"><span>03</span><div><h2>爵士调性环境</h2><p>大调与小调使用各自的功能和声库，分开记录成绩</p></div></div>
+                  <div class="segmented" id="jazz-tonality-options"><button data-jazz-tonality="major">大调</button><button data-jazz-tonality="minor">小调</button></div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span>04</span><div><h2>可用和声语汇</h2><p>语汇包可叠加；未选择的内容不会出现在题目和选项中</p></div></div>
+                  <div class="jazz-pack-list" id="jazz-pack-options">
+                    <button type="button" data-jazz-pack="basic" aria-disabled="true"><strong>基础 · 标准曲骨架（必选）</strong><small>调内七和弦、ii–V–I 与传统小调终止</small></button>
+                    <button type="button" data-jazz-pack="secondary"><strong>进阶 · 属功能扩张</strong><small>次属、连续属和弦；小调 V7♭9</small></button>
+                    <button type="button" data-jazz-pack="advanced"><strong>高级 · 传统替代</strong><small>三全音替代、Backdoor、减七经过与借用下属</small></button>
+                  </div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span>05</span><div><h2>调性中心</h2><p>可多选，每题在所选调性中心随机移调</p></div><strong class="selection-count" id="jazz-key-count"></strong></div>
+                  <div class="token-grid keys" id="jazz-key-options" aria-label="选择爵士调性中心"></div>
+                  <div class="micro-actions"><button type="button" id="jazz-select-all-keys">全部选择</button><button type="button" id="jazz-clear-keys">清空</button></div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span>06</span><div><h2>钢琴配位</h2><p>整段统一优化声部连接，节奏保持等时</p></div></div>
+                  <div class="jazz-voicing-list" id="jazz-voicing-options">
+                    <button type="button" data-jazz-voicing="training"><strong>训练型爵士钢琴</strong><small>低音根音 + 右手三音、七音与自然色彩</small></button>
+                    <button type="button" data-jazz-voicing="shell"><strong>Shell Voicing</strong><small>低音根音 + 三音、七音</small></button>
+                    <button type="button" data-jazz-voicing="rootless"><strong>合奏式 Rootless</strong><small>省略根音，突出 guide tones 与延伸音</small></button>
+                  </div>
+                </section>
+              </div>
+
               <section class="setup-section">
                 <div class="section-title"><span id="instrument-step">05</span><div><h2>演奏音色</h2><p>使用内置真实乐器采样，断网也能播放</p></div></div>
                 <div class="instrument-grid" id="instrument-options">
@@ -190,8 +221,8 @@
           <div class="test-layout">
             <section class="question-card">
               <div class="question-head"><div><p class="eyebrow" id="question-kicker"></p><h1 id="question-title"></h1><p id="question-note"></p></div><div class="question-count"><strong id="question-number">1</strong><span id="question-total">/ 10</span></div></div>
-              <div class="sound-stage" id="sound-stage"><div class="stage-prompt" id="stage-prompt"><div class="staff-lines"></div><div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><button class="play-button" id="play-question" aria-label="播放题目"><span>▶</span></button><small>空格键播放</small></div><div class="review-content is-hidden" id="review-content"></div></div>
-              <div class="feedback-bar" id="feedback-bar" role="status" aria-live="polite"><span>♪</span><b id="feedback-text">播放题目后选择答案</b></div>
+              <div class="sound-stage" id="sound-stage"><button type="button" class="stage-prompt" id="play-question" aria-label="重听题目"><span class="staff-lines" aria-hidden="true"></span><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="stage-center"><span class="stage-play-symbol" data-play-symbol aria-hidden="true">▶</span><strong data-play-label>点击重听题目</strong><small>空格键也可重听</small></span><span class="stage-corner" aria-hidden="true">LISTEN / REPLAY</span></button><div class="review-content is-hidden" id="review-content"></div></div>
+              <div class="feedback-bar" id="feedback-bar" role="status" aria-live="polite"><span>♪</span><b id="feedback-text">听完题目后选择答案</b></div>
               <div class="answer-grid" id="answer-grid"></div>
             </section>
             <aside class="live-panel">
@@ -213,7 +244,8 @@
           </div>
           <section class="chart-card"><div class="card-heading"><div><p class="eyebrow">PROGRESS</p><h2>准确率趋势</h2></div><span>最近 12 次训练</span></div><div class="trend-chart" id="trend-chart"></div></section>
           <section class="insight-card"><div><p class="eyebrow">NEXT STEP</p><h2>训练建议</h2></div><div class="insight-list" id="insight-list"></div></section>
-          <section class="records-card"><div class="card-heading"><div><p class="eyebrow">SESSIONS</p><h2>训练记录</h2></div><select id="history-filter"><option value="all">全部训练</option><option value="interval">音程辨认</option><option value="progression">和弦进行</option></select></div><div id="records-list"></div></section>
+          <section class="jazz-report"><div><p class="eyebrow">TRADITIONAL JAZZ</p><h2>爵士听辨分析</h2></div><div id="jazz-report-content"></div></section>
+          <section class="records-card"><div class="card-heading"><div><p class="eyebrow">SESSIONS</p><h2>训练记录</h2></div><select id="history-filter"><option value="all">全部训练</option><option value="interval">音程辨认</option><option value="progression">综合和弦</option><option value="jazz">传统爵士</option></select></div><div id="records-list"></div></section>
         </section>
       </main>
     </div>
