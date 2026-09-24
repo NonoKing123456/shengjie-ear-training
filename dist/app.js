@@ -89,6 +89,7 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const config = {
   mode:'interval', difficulty:'standard', questionCount:10, instrument:'piano',
   startMode:'random', fixedPitch:0, fixedOctave:4,
+  includeDescending:false, intervalPlayback:'sequential',
   intervals:[...difficultyPresets.standard.intervals],
   chordMode:'generated', tonality:'major', keys:[0,2,7],
   chromaticHarmonies:['V3','V5','N6']
@@ -150,6 +151,8 @@ function syncConfigUI(){
   $$('#start-mode-options button').forEach(button=>button.classList.toggle('is-selected',button.dataset.startMode===config.startMode));
   $$('#fixed-note-options button').forEach(button=>button.classList.toggle('is-selected',Number(button.dataset.fixedPitch)===config.fixedPitch));
   $$('#fixed-octave-options button').forEach(button=>button.classList.toggle('is-selected',Number(button.dataset.octave)===config.fixedOctave));
+  $('#include-descending').checked=config.includeDescending;
+  $$('#interval-playback-options button').forEach(button=>{const selected=button.dataset.intervalPlayback===config.intervalPlayback;button.classList.toggle('is-selected',selected);button.setAttribute('aria-checked',String(selected))});
   $$('#interval-options button').forEach(button=>button.classList.toggle('is-selected',config.intervals.includes(button.dataset.interval)));
   $$('#chord-mode-options button').forEach(button=>button.classList.toggle('is-selected',button.dataset.chordMode===config.chordMode));
   $$('#tonality-options button').forEach(button=>button.classList.toggle('is-selected',button.dataset.tonality===config.tonality));
@@ -165,7 +168,7 @@ function syncConfigUI(){
   $('#fixed-start-panel').classList.toggle('is-hidden',config.startMode!=='fixed');
   $('#generated-harmony-section').classList.toggle('is-hidden',config.chordMode!=='generated');
   $('#warmup-explanation').classList.toggle('is-hidden',config.chordMode!=='warmup');
-  $('#instrument-step').textContent=isInterval?'05':'07';
+  $('#instrument-step').textContent=isInterval?'06':'07';
   $('#interval-count').textContent=`已选 ${config.intervals.length} 个`;
   $('#key-count').textContent=`${config.keys.length} 个调性`;
   $('#chromatic-count').textContent=`已选 ${config.chromaticHarmonies.length} 个`;
@@ -174,7 +177,7 @@ function syncConfigUI(){
 
 function renderConfigSummary(){
   const rows=config.mode==='interval'?
-    [['内容','音程辨认'],['难度',difficultyNames[config.difficulty]],['起始音',config.startMode==='random'?'系统随机':`${keys.find(item=>item.value===config.fixedPitch).name}${config.fixedOctave}`],['范围',`${config.intervals.length} 个音程 · 最远两八度`],['音色',instrumentNames[config.instrument]],['题量',`${config.questionCount} 题`]]:
+    [['内容','音程辨认'],['难度',difficultyNames[config.difficulty]],['起始音',config.startMode==='random'?'系统随机':`${keys.find(item=>item.value===config.fixedPitch).name}${config.fixedOctave}`],['方向',config.includeDescending?'上行 + 下行':'仅上行'],['发声',config.intervalPlayback==='simultaneous'?'同时发声':'依次发声'],['范围',`${config.intervals.length} 个音程 · 最远两八度`],['音色',instrumentNames[config.instrument]],['题量',`${config.questionCount} 题`]]:
     [['内容','和弦进行'],['方式',chordModeNames[config.chordMode]],['调式',tonalityNames[config.tonality]],['调性中心',`${config.keys.length} 个`],['调外和声',config.chordMode==='generated'?`${config.chromaticHarmonies.length} 个可用`:'热身模式不使用'],['音色',instrumentNames[config.instrument]],['题量',`${config.questionCount} 题`]];
   $('#config-summary').innerHTML=rows.map(([term,value])=>`<div><dt>${term}</dt><dd>${value}</dd></div>`).join('');
 }
@@ -223,8 +226,10 @@ function intervalQuestion(session){
   const items=intervalBank.filter(item=>session.intervals.includes(item.id));
   const item=randomItem(items,state.lastQuestionId);state.lastQuestionId=item.id;
   const choices=items.map(option=>({id:option.id,name:option.name}));
-  const rootMidi=session.startMode==='fixed'?12*(session.fixedOctave+1)+session.fixedPitch:48+Math.floor(Math.random()*20);
-  return {...item,rootMidi,choiceOptions:choices,keyName:null,usedChromatic:false};
+  const direction=session.includeDescending&&Math.random()<.5?-1:1;
+  const rootMidi=session.startMode==='fixed'?12*(session.fixedOctave+1)+session.fixedPitch:(direction===1?48:64)+Math.floor(Math.random()*17);
+  const targetMidi=rootMidi+direction*item.semitones;
+  return {...item,rootMidi,targetMidi,direction,choiceOptions:choices,keyName:null,usedChromatic:false};
 }
 
 function chordQuestion(session){
@@ -262,7 +267,7 @@ function newQuestion(){
 
 function renderSessionTags(){
   const session=state.sessionConfig;const tags=session.mode==='interval'?
-    ['音程辨认',difficultyNames[session.difficulty],session.startMode==='random'?'随机起始音':`固定 ${keys.find(item=>item.value===session.fixedPitch).name}${session.fixedOctave}`,'两八度范围',instrumentNames[session.instrument]]:
+    ['音程辨认',difficultyNames[session.difficulty],session.startMode==='random'?'随机起始音':`固定 ${keys.find(item=>item.value===session.fixedPitch).name}${session.fixedOctave}`,session.includeDescending?'含下行':'仅上行',session.intervalPlayback==='simultaneous'?'同时发声':'依次发声','两八度范围',instrumentNames[session.instrument]]:
     ['和弦进行',chordModeNames[session.chordMode],tonalityNames[session.tonality],`${session.keys.length} 个调性中心`,instrumentNames[session.instrument]];
   $('#session-tags').innerHTML=tags.map(text=>`<span>${text}</span>`).join('');
 }
@@ -271,7 +276,7 @@ function renderQuestion(){
   const interval=state.sessionConfig.mode==='interval';
   $('#question-kicker').textContent=`${interval?'INTERVAL':'CHORD PROGRESSION'} · ${String(state.index+1).padStart(2,'0')}`;
   $('#question-title').textContent=interval?'听辨这两个音的距离':state.sessionConfig.chordMode==='warmup'?'识别这段常见和弦进行':'找出最符合音响的和声进行';
-  $('#question-note').textContent=interval?`${state.sessionConfig.startMode==='random'?'起始音每题随机':'本轮使用固定起始音'} · ${state.sessionConfig.intervals.length} 个音程按距离排列 · ${instrumentNames[state.sessionConfig.instrument]}音色`:`${tonalityNames[state.sessionConfig.tonality]} · 从 ${state.sessionConfig.keys.length} 个调性中心随机移调 · ${instrumentNames[state.sessionConfig.instrument]}音色`;
+  $('#question-note').textContent=interval?`${state.sessionConfig.startMode==='random'?'起始音每题随机':'本轮使用固定起始音'} · ${state.sessionConfig.includeDescending?'随机上行或下行':'仅上行'} · ${state.sessionConfig.intervalPlayback==='simultaneous'?'两音同时发声':'两音依次发声'} · ${state.sessionConfig.intervals.length} 个音程按距离排列 · ${instrumentNames[state.sessionConfig.instrument]}音色`:`${tonalityNames[state.sessionConfig.tonality]} · 从 ${state.sessionConfig.keys.length} 个调性中心随机移调 · ${instrumentNames[state.sessionConfig.instrument]}音色`;
   $('#question-number').textContent=String(state.index+1);$('#question-total').textContent=`/ ${state.sessionConfig.questionCount}`;
   $('#answer-grid').classList.toggle('is-interval',interval);
   $('#answer-grid').innerHTML=state.question.choiceOptions.map((option,index)=>`<button data-answer="${option.id}"><span>${option.name}${option.subtitle?`<small>${option.subtitle}</small>`:''}</span>${interval?'':`<kbd>${index+1}</kbd>`}</button>`).join('');
@@ -356,9 +361,10 @@ async function playQuestion(){
   $('#feedback-text').textContent=usedFallback?'采样暂不可用，正在使用备用音色':'正在播放真实乐器采样';
   const settings=soundfontPlayback[session.instrument];const now=ctx.currentTime+.05;let animationMs;
   if(session.mode==='interval'){
-    if(usedFallback){fallbackSynthTone(ctx,question.rootMidi,now,.76,.15);fallbackSynthTone(ctx,question.rootMidi+question.semitones,now+.92,.82,.15)}
-    else{player.queueWaveTable(now,question.rootMidi,settings.noteDuration,settings.singleVolume);player.queueWaveTable(now+.92,question.rootMidi+question.semitones,settings.noteDuration,settings.singleVolume)}
-    animationMs=2150;
+    const simultaneous=session.intervalPlayback==='simultaneous';const targetStart=simultaneous?now:now+.92;const volume=simultaneous?settings.singleVolume*.82:settings.singleVolume;
+    if(usedFallback){fallbackSynthTone(ctx,question.rootMidi,now,.76,simultaneous?.12:.15);fallbackSynthTone(ctx,question.targetMidi,targetStart,.82,simultaneous?.12:.15)}
+    else{player.queueWaveTable(now,question.rootMidi,settings.noteDuration,volume);player.queueWaveTable(targetStart,question.targetMidi,settings.noteDuration,volume)}
+    animationMs=simultaneous?1450:2150;
   }else{
     question.chords.forEach((notes,chordIndex)=>{
       const chordStart=now+chordIndex*.9;
@@ -406,6 +412,7 @@ function finishSession(){
     averageResponseMs:Math.round(state.answers.reduce((sum,item)=>sum+item.elapsed,0)/state.answers.length),
     durationSeconds:Math.round((endedAt-state.startedAt)/1000),createdAt:new Date().toISOString(),instrument:state.sessionConfig.instrument,
     startMode:state.sessionConfig.startMode,fixedPitch:state.sessionConfig.fixedPitch,fixedOctave:state.sessionConfig.fixedOctave,
+    includeDescending:state.sessionConfig.includeDescending,intervalPlayback:state.sessionConfig.intervalPlayback,
     chordMode:state.sessionConfig.chordMode,tonality:state.sessionConfig.tonality,keys:state.sessionConfig.keys,
     intervals:state.sessionConfig.intervals,chromaticHarmonies:state.sessionConfig.chromaticHarmonies,
     allowChromatic:state.sessionConfig.mode==='progression'&&state.sessionConfig.chordMode==='generated'&&state.sessionConfig.chromaticHarmonies.length>0,
@@ -449,7 +456,7 @@ function renderInsights({records,intervalScore,progressionScore,consistency}){
 }
 
 function recordDetail(record){
-  if(record.mode==='interval')return record.startMode==='fixed'?'固定起始音':'随机起始音';
+  if(record.mode==='interval')return `${record.startMode==='fixed'?'固定起始音':'随机起始音'} · ${record.includeDescending?'含下行':'仅上行'} · ${record.intervalPlayback==='simultaneous'?'同时发声':'依次发声'}`;
   if(record.chordMode)return `${chordModeNames[record.chordMode]||'和弦训练'} · ${tonalityNames[record.tonality]||'大调'}`;
   return record.allowChromatic?'含离调':'调内';
 }
@@ -473,6 +480,8 @@ function bindEvents(){
   $$('#instrument-options button').forEach(button=>button.addEventListener('click',()=>{config.instrument=button.dataset.instrument;syncConfigUI();void prepareInstrument(config.instrument).catch(()=>{})}));
   $$('#start-mode-options button').forEach(button=>button.addEventListener('click',()=>{config.startMode=button.dataset.startMode;syncConfigUI()}));
   $$('#fixed-octave-options button').forEach(button=>button.addEventListener('click',()=>{config.fixedOctave=Number(button.dataset.octave);syncConfigUI()}));
+  $('#include-descending').addEventListener('change',event=>{config.includeDescending=event.target.checked;syncConfigUI()});
+  $$('#interval-playback-options button').forEach(button=>button.addEventListener('click',()=>{config.intervalPlayback=button.dataset.intervalPlayback;syncConfigUI()}));
   $$('#chord-mode-options button').forEach(button=>button.addEventListener('click',()=>{config.chordMode=button.dataset.chordMode;syncConfigUI()}));
   $$('#tonality-options button').forEach(button=>button.addEventListener('click',()=>{config.tonality=button.dataset.tonality;syncConfigUI()}));
   $('#select-all-keys').addEventListener('click',()=>{config.keys=keys.map(item=>item.value);syncConfigUI()});

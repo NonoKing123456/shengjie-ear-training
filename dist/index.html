@@ -18,6 +18,10 @@
       .choice-card.is-selected{border-color:#c9ff55;background:rgba(201,255,85,.08);box-shadow:inset 0 0 0 1px rgba(201,255,85,.18)}
       .fixed-start-panel{margin-top:18px;padding:18px;border:1px solid rgba(141,164,171,.14);border-radius:14px;background:rgba(0,0,0,.12)}
       .fixed-start-panel .field-label:not(:first-child){margin-top:16px}
+      .presentation-settings{display:grid;gap:10px}
+      .presentation-row{display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:72px;padding:14px 16px;border:1px solid rgba(141,164,171,.14);border-radius:13px;background:rgba(0,0,0,.12)}
+      .presentation-row-copy strong,.presentation-row-copy small{display:block}.presentation-row-copy strong{font-size:.82rem}.presentation-row-copy small{margin-top:5px;color:#8da4ab;font-size:.7rem;line-height:1.45}
+      .presentation-row .segmented{flex:none}
       .warmup-note{padding:18px;border:1px solid rgba(201,255,85,.18);border-radius:14px;background:rgba(201,255,85,.06);color:#aebfc4;line-height:1.7}
       .warmup-note strong{display:block;color:#edf6f3;margin-bottom:4px}
       .harmony-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -30,7 +34,7 @@
       .answer-grid.is-interval kbd{display:none}
       @media(max-width:850px){.setup-layout,.test-layout{grid-template-columns:1fr}}
       @media(max-width:600px){.answer-grid.is-interval{grid-template-columns:repeat(2,minmax(0,1fr))}}
-      @media(max-width:580px){.choice-cards,.harmony-list{grid-template-columns:1fr}}
+      @media(max-width:580px){.choice-cards,.harmony-list{grid-template-columns:1fr}.presentation-row{align-items:flex-start;flex-direction:column}.presentation-row .segmented{width:100%}.presentation-row .segmented button{flex:1}}
     </style>
     <script src="./vendor/webaudiofont/WebAudioFontPlayer.js" defer></script>
     <script src="./assets/soundfonts/piano.js" defer></script>
@@ -89,7 +93,23 @@
                   </div>
                 </section>
                 <section class="setup-section">
-                  <div class="section-title"><span>04</span><div><h2>音程范围</h2><p>从小二度到双八度，可精确选择本轮内容</p></div><strong class="selection-count" id="interval-count"></strong></div>
+                  <div class="section-title"><span>04</span><div><h2>呈现方式</h2><p>控制音程方向，以及两个音的触发关系</p></div></div>
+                  <div class="presentation-settings">
+                    <div class="presentation-row">
+                      <div class="presentation-row-copy"><strong>音程方向</strong><small>关闭时只出上行；开启后，上行和下行会随机出现。</small></div>
+                      <label class="switch"><input id="include-descending" type="checkbox"/><i></i><b>包含下行</b></label>
+                    </div>
+                    <div class="presentation-row">
+                      <div class="presentation-row-copy"><strong>发声方式</strong><small>选择两个音依次出现，或在同一时刻组成和声音程。</small></div>
+                      <div class="segmented" id="interval-playback-options" role="radiogroup" aria-label="音程发声方式">
+                        <button class="is-selected" data-interval-playback="sequential" role="radio" aria-checked="true">一个接一个</button>
+                        <button data-interval-playback="simultaneous" role="radio" aria-checked="false">同时响</button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span>05</span><div><h2>音程范围</h2><p>从小二度到双八度，可精确选择本轮内容</p></div><strong class="selection-count" id="interval-count"></strong></div>
                   <div class="token-grid intervals" id="interval-options"></div>
                 </section>
               </div>
