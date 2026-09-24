@@ -71,6 +71,18 @@ const instrumentNames = { piano:'钢琴', guitar:'吉他', sax:'萨克斯', viol
 const difficultyNames = { foundation:'基础', standard:'标准', advanced:'进阶' };
 const tonalityNames = { major:'大调', minor:'小调' };
 const chordModeNames = { generated:'随机和声', warmup:'常见进行热身' };
+const soundfontPresets = {
+  piano:()=>window._tone_0000_FluidR3_GM_sf2_file,
+  guitar:()=>window._tone_0250_FluidR3_GM_sf2_file,
+  sax:()=>window._tone_0650_FluidR3_GM_sf2_file,
+  violin:()=>window._tone_0400_FluidR3_GM_sf2_file
+};
+const soundfontPlayback = {
+  piano:{singleVolume:.58,chordVolume:.2,noteDuration:1.05,chordDuration:.78,strum:0},
+  guitar:{singleVolume:.64,chordVolume:.24,noteDuration:.95,chordDuration:.72,strum:.022},
+  sax:{singleVolume:.46,chordVolume:.16,noteDuration:1.05,chordDuration:.78,strum:0},
+  violin:{singleVolume:.42,chordVolume:.15,noteDuration:1.1,chordDuration:.82,strum:0}
+};
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
@@ -85,7 +97,8 @@ const config = {
 const state = {
   sessionConfig:null, question:null, lastQuestionId:null, index:0, correct:0, streak:0,
   maxStreak:0, answers:[], startedAt:null, questionStartedAt:null, locked:false,
-  timerId:null, audioContext:null
+  timerId:null, audioContext:null, audioBus:null, audioBusy:false,
+  soundfontPlayers:{}, soundfontPromises:{}
 };
 
 function historyData(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch{return[]}}
@@ -230,18 +243,20 @@ function chordQuestion(session){
 function startSession(){
   const error=validateConfig();$('#config-error').textContent=error;if(error)return;
   state.sessionConfig=clone(config);resetSessionState();switchView('train');newQuestion();renderSessionTags();updateLiveStats();
+  void prepareInstrument(state.sessionConfig.instrument).catch(()=>{});
 }
 
 function resetSessionState(){
   clearInterval(state.timerId);
-  Object.assign(state,{question:null,lastQuestionId:null,index:0,correct:0,streak:0,maxStreak:0,answers:[],startedAt:null,questionStartedAt:null,locked:false,timerId:null});
+  cancelSamplePlayback();
+  Object.assign(state,{question:null,lastQuestionId:null,index:0,correct:0,streak:0,maxStreak:0,answers:[],startedAt:null,questionStartedAt:null,locked:false,timerId:null,audioBusy:false});
   $('#timer').textContent='00:00';$('#feedback-bar').className='feedback-bar';$('#feedback-text').textContent='播放题目后选择答案';
 }
 
 function restartSession(){resetSessionState();newQuestion();renderSessionTags();updateLiveStats()}
 
 function newQuestion(){
-  state.locked=false;state.question=state.sessionConfig.mode==='interval'?intervalQuestion(state.sessionConfig):chordQuestion(state.sessionConfig);
+  cancelSamplePlayback();state.audioBusy=false;state.locked=false;state.question=state.sessionConfig.mode==='interval'?intervalQuestion(state.sessionConfig):chordQuestion(state.sessionConfig);
   state.questionStartedAt=Date.now();renderQuestion();
 }
 
@@ -263,14 +278,56 @@ function renderQuestion(){
 }
 
 async function getAudioContext(){
-  if(!state.audioContext)state.audioContext=new (window.AudioContext||window.webkitAudioContext)();
+  if(!state.audioContext){
+    state.audioContext=new (window.AudioContext||window.webkitAudioContext)();
+    const compressor=state.audioContext.createDynamicsCompressor();
+    compressor.threshold.value=-18;compressor.knee.value=16;compressor.ratio.value=4;
+    compressor.attack.value=.004;compressor.release.value=.2;compressor.connect(state.audioContext.destination);
+    state.audioBus={input:compressor};
+  }
   if(state.audioContext.state==='suspended')await state.audioContext.resume();
   return state.audioContext;
 }
 
+function setSoundfontStatus(kind,text){
+  const status=$('#soundfont-status');if(!status)return;
+  status.classList.toggle('is-loading',kind==='loading');status.classList.toggle('is-error',kind==='error');
+  status.querySelector('span').textContent=text;
+}
+
+async function prepareInstrument(instrument){
+  const ctx=await getAudioContext();
+  if(state.soundfontPlayers[instrument]){
+    if(config.instrument===instrument)setSoundfontStatus('ready',`${instrumentNames[instrument]}真实采样已就绪，可离线播放。`);
+    return state.soundfontPlayers[instrument];
+  }
+  if(!state.soundfontPromises[instrument]){
+    const preset=soundfontPresets[instrument]?.();
+    if(!window.WebAudioFontPlayer||!preset)throw new Error(`缺少 ${instrumentNames[instrument]} SoundFont 资源`);
+    setSoundfontStatus('loading',`正在解码${instrumentNames[instrument]}真实采样…`);
+    state.soundfontPromises[instrument]=window.WebAudioFontPlayer.load(preset,ctx,state.audioBus).then(player=>{
+      state.soundfontPlayers[instrument]=player;
+      if(config.instrument===instrument)setSoundfontStatus('ready',`${instrumentNames[instrument]}真实采样已就绪，可离线播放。`);
+      return player;
+    }).catch(error=>{
+      delete state.soundfontPromises[instrument];
+      setSoundfontStatus('error',`${instrumentNames[instrument]}采样加载失败，将使用备用合成音。`);
+      throw error;
+    });
+  }
+  return state.soundfontPromises[instrument];
+}
+
+function cancelSamplePlayback(){
+  Object.values(state.soundfontPlayers).forEach(player=>player.cancelQueue().catch(()=>{}));
+  const play=$('#play-question');const wave=$('.wave');
+  if(play){play.disabled=false;play.classList.remove('is-playing');play.querySelector('span').textContent='▶'}
+  if(wave)wave.classList.remove('is-playing');
+}
+
 function midiToHz(midi){return 440*(2**((midi-69)/12))}
 
-function synthTone(ctx,midi,start,duration,volume=.12){
+function fallbackSynthTone(ctx,midi,start,duration,volume=.12){
   const instrument=state.sessionConfig.instrument;
   const presets={
     piano:{types:['triangle','sine'],attack:.008,release:.88,detune:[0,4]},
@@ -287,15 +344,37 @@ function synthTone(ctx,midi,start,duration,volume=.12){
 }
 
 async function playQuestion(){
-  if(!state.question)return;ensureSessionStarted();
-  const ctx=await getAudioContext();const play=$('#play-question');const wave=$('.wave');
+  if(!state.question||state.locked||state.audioBusy)return;ensureSessionStarted();state.audioBusy=true;
+  const question=state.question;const session=state.sessionConfig;const play=$('#play-question');const wave=$('.wave');
+  play.disabled=true;$('#feedback-text').textContent=`正在准备${instrumentNames[session.instrument]}真实采样…`;
+  let player;let ctx;let usedFallback=false;
+  try{ctx=await getAudioContext();player=await prepareInstrument(session.instrument);await player.cancelQueue()}
+  catch(error){console.warn('SoundFont playback unavailable, using fallback synth.',error);ctx=await getAudioContext();usedFallback=true}
+  if(question!==state.question){state.audioBusy=false;play.disabled=false;return}
   play.classList.add('is-playing');wave.classList.add('is-playing');play.querySelector('span').textContent='■';
-  if(state.sessionConfig.mode==='interval'){
-    const now=ctx.currentTime+.04;synthTone(ctx,state.question.rootMidi,now,.68,.15);synthTone(ctx,state.question.rootMidi+state.question.semitones,now+.82,.76,.15);setTimeout(stopAnimation,1750);
+  $('#feedback-text').textContent=usedFallback?'采样暂不可用，正在使用备用音色':'正在播放真实乐器采样';
+  const settings=soundfontPlayback[session.instrument];const now=ctx.currentTime+.05;let animationMs;
+  if(session.mode==='interval'){
+    if(usedFallback){fallbackSynthTone(ctx,question.rootMidi,now,.76,.15);fallbackSynthTone(ctx,question.rootMidi+question.semitones,now+.92,.82,.15)}
+    else{player.queueWaveTable(now,question.rootMidi,settings.noteDuration,settings.singleVolume);player.queueWaveTable(now+.92,question.rootMidi+question.semitones,settings.noteDuration,settings.singleVolume)}
+    animationMs=2150;
   }else{
-    const now=ctx.currentTime+.04;state.question.chords.forEach((notes,index)=>notes.forEach(note=>synthTone(ctx,state.question.rootMidi+note,now+index*.82,.72,.067)));setTimeout(stopAnimation,state.question.chords.length*820+140);
+    question.chords.forEach((notes,chordIndex)=>{
+      const chordStart=now+chordIndex*.9;
+      notes.forEach((note,noteIndex)=>{
+        const start=chordStart+noteIndex*settings.strum;const midi=question.rootMidi+note;
+        if(usedFallback)fallbackSynthTone(ctx,midi,start,settings.chordDuration,.062);
+        else player.queueWaveTable(start,midi,settings.chordDuration,settings.chordVolume);
+      });
+    });
+    animationMs=question.chords.length*900+160;
   }
-  function stopAnimation(){play.classList.remove('is-playing');wave.classList.remove('is-playing');play.querySelector('span').textContent='▶'}
+  setTimeout(stopAnimation,animationMs);
+  function stopAnimation(){
+    if(question!==state.question)return;
+    state.audioBusy=false;play.disabled=false;play.classList.remove('is-playing');wave.classList.remove('is-playing');play.querySelector('span').textContent='▶';
+    if(!state.locked)$('#feedback-text').textContent='请选择答案';
+  }
 }
 
 function ensureSessionStarted(){if(state.startedAt)return;state.startedAt=Date.now();state.questionStartedAt=Date.now();state.timerId=setInterval(updateTimer,1000)}
@@ -390,7 +469,7 @@ function bindEvents(){
   $$('.mode-card').forEach(button=>button.addEventListener('click',()=>{config.mode=button.dataset.mode;syncConfigUI()}));
   $$('#difficulty-options button').forEach(button=>button.addEventListener('click',()=>setDifficulty(button.dataset.difficulty)));
   $$('#question-count-options button').forEach(button=>button.addEventListener('click',()=>{config.questionCount=Number(button.dataset.count);syncConfigUI()}));
-  $$('#instrument-options button').forEach(button=>button.addEventListener('click',()=>{config.instrument=button.dataset.instrument;syncConfigUI()}));
+  $$('#instrument-options button').forEach(button=>button.addEventListener('click',()=>{config.instrument=button.dataset.instrument;syncConfigUI();void prepareInstrument(config.instrument).catch(()=>{})}));
   $$('#start-mode-options button').forEach(button=>button.addEventListener('click',()=>{config.startMode=button.dataset.startMode;syncConfigUI()}));
   $$('#fixed-octave-options button').forEach(button=>button.addEventListener('click',()=>{config.fixedOctave=Number(button.dataset.octave);syncConfigUI()}));
   $$('#chord-mode-options button').forEach(button=>button.addEventListener('click',()=>{config.chordMode=button.dataset.chordMode;syncConfigUI()}));
