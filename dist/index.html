@@ -22,6 +22,9 @@
       .presentation-row{display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:72px;padding:14px 16px;border:1px solid rgba(141,164,171,.14);border-radius:13px;background:rgba(0,0,0,.12)}
       .presentation-row-copy strong,.presentation-row-copy small{display:block}.presentation-row-copy strong{font-size:.82rem}.presentation-row-copy small{margin-top:5px;color:#8da4ab;font-size:.7rem;line-height:1.45}
       .presentation-row .segmented{flex:none}
+      .presentation-row.is-disabled{opacity:.46}.presentation-row.is-disabled .segmented button{cursor:not-allowed}
+      #interval-direction-options button{min-width:66px}
+      .interval-presets{margin-bottom:16px}.interval-presets button{min-width:118px}
       .warmup-note{padding:18px;border:1px solid rgba(201,255,85,.18);border-radius:14px;background:rgba(201,255,85,.06);color:#aebfc4;line-height:1.7}
       .warmup-note strong{display:block;color:#edf6f3;margin-bottom:4px}
       .harmony-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -95,9 +98,13 @@
                 <section class="setup-section">
                   <div class="section-title"><span>04</span><div><h2>呈现方式</h2><p>控制音程方向，以及两个音的触发关系</p></div></div>
                   <div class="presentation-settings">
-                    <div class="presentation-row">
-                      <div class="presentation-row-copy"><strong>音程方向</strong><small>关闭时只出上行；开启后，上行和下行会随机出现。</small></div>
-                      <label class="switch"><input id="include-descending" type="checkbox"/><i></i><b>包含下行</b></label>
+                    <div class="presentation-row" id="interval-direction-row">
+                      <div class="presentation-row-copy"><strong>音程方向</strong><small>上行与下行连续点选时自动合并为交替出现；交替表示每题随机方向。</small></div>
+                      <div class="segmented" id="interval-direction-options" role="radiogroup" aria-label="音程方向">
+                        <button class="is-selected" data-interval-direction="ascending" role="radio" aria-checked="true">上行</button>
+                        <button data-interval-direction="descending" role="radio" aria-checked="false">下行</button>
+                        <button data-interval-direction="mixed" role="radio" aria-checked="false">交替出现</button>
+                      </div>
                     </div>
                     <div class="presentation-row">
                       <div class="presentation-row-copy"><strong>发声方式</strong><small>选择两个音依次出现，或在同一时刻组成和声音程。</small></div>
@@ -110,6 +117,13 @@
                 </section>
                 <section class="setup-section">
                   <div class="section-title"><span>05</span><div><h2>音程范围</h2><p>从小二度到双八度，可精确选择本轮内容</p></div><strong class="selection-count" id="interval-count"></strong></div>
+                  <p class="field-label">快速预设</p>
+                  <div class="token-grid interval-presets" id="interval-preset-options">
+                    <button data-interval-preset="fifth">五度内音程</button>
+                    <button data-interval-preset="octave">八度内所有音程</button>
+                    <button data-interval-preset="all">所有音程</button>
+                  </div>
+                  <p class="field-label">逐项选择</p>
                   <div class="token-grid intervals" id="interval-options"></div>
                 </section>
               </div>
