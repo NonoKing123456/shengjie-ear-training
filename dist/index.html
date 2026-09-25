@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="本地练耳训练工具，支持两八度音程辨认、随机和声生成、常见进行热身与学习档案。" />
+    <meta name="description" content="本地练耳训练工具，支持音程、和弦、爵士与旋律听写。" />
     <meta name="theme-color" content="#08151b" />
     <title>声阶 · Ear Training</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2308151b'/%3E%3Cpath d='M13 35h7l5-16 8 30 6-22 5 8h7' fill='none' stroke='%23c9ff55' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="./styles.css?v=tonality-first-3" />
+    <link rel="stylesheet" href="./styles.css?v=melody-15" />
     <style>
       .app-shell{width:min(980px,100%)}
       .setup-layout{grid-template-columns:minmax(0,1fr) 260px}
@@ -48,7 +48,8 @@
     <script src="./jazz.js" defer></script>
     <script src="./vendor/vexflow/vexflow.js" defer></script>
     <script src="./jazz-notation.js?v=equal-chord-hit-2" defer></script>
-    <script src="./app.js?v=tonality-first-1" defer></script>
+    <script src="./melody.js?v=melody-18" defer></script>
+    <script src="./app.js?v=melody-18" defer></script>
     <script src="./review.js" defer></script>
   </head>
   <body>
@@ -63,7 +64,7 @@
           <div class="page-intro">
             <p class="eyebrow">BUILD YOUR SESSION</p>
             <h1>定制一场真正适合你的训练</h1>
-            <p>音程、综合和弦与传统爵士各有独立训练逻辑。选好本轮范围与音色，再进入训练。</p>
+            <p>音程、综合和弦、传统爵士与旋律听写各有独立训练逻辑。选好本轮范围与音色，再进入训练。</p>
           </div>
 
           <div class="setup-layout">
@@ -74,6 +75,7 @@
                   <button class="mode-card is-selected" data-mode="interval" role="radio" aria-checked="true"><span class="mode-icon">↕</span><strong>音程辨认</strong><small>辨认两个音之间的距离</small></button>
                   <button class="mode-card" data-mode="progression" role="radio" aria-checked="false"><span class="mode-icon">♬</span><strong>综合和弦</strong><small>现有和声生成与常见进行热身</small></button>
                   <button class="mode-card" data-mode="jazz" role="radio" aria-checked="false"><span class="mode-icon">♫</span><strong>传统爵士</strong><small>功能进行、七和弦与连续声部</small></button>
+                  <button class="mode-card" data-mode="melody" role="radio" aria-checked="false"><span class="mode-icon">𝄞</span><strong>旋律听写</strong><small>在五线谱上写下听到的音高</small></button>
                 </div>
               </section>
 
@@ -189,6 +191,30 @@
                 </section>
               </div>
 
+              <div class="is-hidden" id="melody-settings">
+                <section class="setup-section">
+                  <div class="section-title"><span>03</span><div><h2>旋律环境</h2><p>每轮只选择一种音高体系</p></div></div>
+                  <div class="melody-environments" id="melody-environment-options" role="radiogroup" aria-label="旋律环境">
+                    <button type="button" data-melody-environment="major">大调</button>
+                    <button type="button" data-melody-environment="minor">小调</button>
+                    <button type="button" data-melody-environment="majorChromatic">大调 + 调外色彩</button>
+                    <button type="button" data-melody-environment="minorChromatic">小调 + 调外色彩</button>
+                    <button type="button" data-melody-environment="atonal">无调性随机</button>
+                  </div>
+                </section>
+                <section class="setup-section" id="melody-key-section">
+                  <div class="section-title"><span>04</span><div><h2>调性中心</h2><p>可多选；无调性环境不使用调号</p></div><strong class="selection-count" id="melody-key-count"></strong></div>
+                  <div class="token-grid keys" id="melody-key-options" aria-label="选择旋律调性"></div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span id="melody-length-step">05</span><div><h2>长度与音域</h2><p>每个音都是等时值四分音符，首音已给出</p></div></div>
+                  <p class="field-label">旋律长度</p>
+                  <div class="segmented" id="melody-length-options"><button type="button" data-melody-length="4">4 音</button><button type="button" data-melody-length="5">5 音</button><button type="button" data-melody-length="6">6 音</button></div>
+                  <p class="field-label">相对首音的范围</p>
+                  <div class="segmented" id="melody-range-options"><button type="button" data-melody-range="7">五度内</button><button type="button" data-melody-range="12">八度内</button></div>
+                </section>
+              </div>
+
               <section class="setup-section">
                 <div class="section-title"><span id="instrument-step">05</span><div><h2>演奏音色</h2><p>使用内置真实乐器采样，断网也能播放</p></div></div>
                 <div class="instrument-grid" id="instrument-options">
@@ -227,6 +253,7 @@
               <div class="feedback-bar" id="feedback-bar" role="status" aria-live="polite"><span>♪</span><b id="feedback-text">听完题目后选择答案</b></div>
               <p class="answer-prompt is-hidden" id="answer-prompt">选择你听到的进行</p>
               <div class="answer-grid" id="answer-grid"></div>
+              <div class="melody-workspace is-hidden" id="melody-workspace"></div>
             </section>
             <aside class="live-panel">
               <div><p class="eyebrow">LIVE SESSION</p><h2>本轮表现</h2></div>
@@ -248,7 +275,8 @@
           <section class="chart-card"><div class="card-heading"><div><p class="eyebrow">PROGRESS</p><h2>准确率趋势</h2></div><span>最近 12 次训练</span></div><div class="trend-chart" id="trend-chart"></div></section>
           <section class="insight-card"><div><p class="eyebrow">NEXT STEP</p><h2>训练建议</h2></div><div class="insight-list" id="insight-list"></div></section>
           <section class="jazz-report"><div><p class="eyebrow">TRADITIONAL JAZZ</p><h2>爵士听辨分析</h2></div><div id="jazz-report-content"></div></section>
-          <section class="records-card"><div class="card-heading"><div><p class="eyebrow">SESSIONS</p><h2>训练记录</h2></div><select id="history-filter"><option value="all">全部训练</option><option value="interval">音程辨认</option><option value="progression">综合和弦</option><option value="jazz">传统爵士</option></select></div><div id="records-list"></div></section>
+          <section class="melody-report"><div><p class="eyebrow">MELODIC DICTATION</p><h2>旋律听写分析</h2></div><div id="melody-report-content"></div></section>
+          <section class="records-card"><div class="card-heading"><div><p class="eyebrow">SESSIONS</p><h2>训练记录</h2></div><select id="history-filter"><option value="all">全部训练</option><option value="interval">音程辨认</option><option value="progression">综合和弦</option><option value="jazz">传统爵士</option><option value="melody">旋律听写</option></select></div><div id="records-list"></div></section>
         </section>
       </main>
     </div>
