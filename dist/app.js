@@ -317,16 +317,25 @@ function renderQuestion(){
   const interval=state.sessionConfig.mode==='interval';
   $('#sound-stage').classList.remove('is-review');$('#play-question').classList.remove('is-hidden');$('#review-content').classList.add('is-hidden');$('#review-content').innerHTML='';
   const jazz=state.sessionConfig.mode==='jazz';
-  $('#question-kicker').textContent=`${interval?'INTERVAL':jazz?'TRADITIONAL JAZZ':'CHORD PROGRESSION'} · ${String(state.index+1).padStart(2,'0')}`;
+  const harmony=!interval;
+  $('#train-view').classList.toggle('is-harmony',harmony);
+  $('#train-view').classList.remove('is-reviewing');
+  $('#question-kicker').textContent=harmony?
+    jazz?`TRADITIONAL JAZZ · ${state.sessionConfig.jazzPacks.map(pack=>jazzPackNames[pack]).join(' + ')}包`:`CHORD PROGRESSION · ${chordModeNames[state.sessionConfig.chordMode]}`:
+    `INTERVAL · ${String(state.index+1).padStart(2,'0')}`;
   $('#question-title').textContent=interval?'听辨这两个音的距离':jazz?'听辨这段爵士和声进行':state.sessionConfig.chordMode==='warmup'?'识别这段常见和弦进行':'找出最符合音响的和声进行';
   const directionNote=state.sessionConfig.intervalPlayback==='simultaneous'?'无方向':state.sessionConfig.intervalDirection==='mixed'?'上行或下行随机':intervalDirectionNames[state.sessionConfig.intervalDirection];
-  $('#question-note').textContent=interval?`${state.sessionConfig.startMode==='random'?'起始音每题随机':'本轮使用固定起始音'} · ${directionNote} · ${state.sessionConfig.intervalPlayback==='simultaneous'?'两音同时发声':'两音依次发声'} · ${state.sessionConfig.intervals.length} 个音程按距离排列 · ${instrumentNames[state.sessionConfig.instrument]}音色`:
-    jazz?`传统爵士 · ${state.question.keyName} ${tonalityNames[state.sessionConfig.jazzTonality]} · ${state.sessionConfig.jazzPacks.map(pack=>jazzPackNames[pack]).join(' + ')}包 · ${jazzVoicingNames[state.sessionConfig.jazzVoicing]}`:
-    `${tonalityNames[state.sessionConfig.tonality]} · 从 ${state.sessionConfig.keys.length} 个调性中心随机移调 · ${instrumentNames[state.sessionConfig.instrument]}音色`;
+  $('#question-note').textContent=interval?`${state.sessionConfig.startMode==='random'?'起始音每题随机':'本轮使用固定起始音'} · ${directionNote} · ${state.sessionConfig.intervalPlayback==='simultaneous'?'两音同时发声':'两音依次发声'} · ${state.sessionConfig.intervals.length} 个音程按距离排列 · ${instrumentNames[state.sessionConfig.instrument]}音色`:'';
+  $('#question-tonality').classList.toggle('is-hidden',!harmony);
+  $('#question-tonality').textContent=harmony?`${state.question.keyName} ${tonalityNames[jazz?state.sessionConfig.jazzTonality:state.sessionConfig.tonality]}`:'';
   $('#question-number').textContent=String(state.index+1);$('#question-total').textContent=`/ ${state.sessionConfig.questionCount}`;
   $('#answer-grid').classList.toggle('is-interval',interval);
   $('#answer-grid').classList.toggle('is-jazz',jazz);
-  $('#answer-grid').innerHTML=state.question.choiceOptions.map((option,index)=>`<button data-answer="${option.id}"><span>${option.name}${option.subtitle?`<small>${option.subtitle}</small>`:''}</span>${interval?'':`<kbd>${index+1}</kbd>`}</button>`).join('');
+  $('#answer-grid').classList.toggle('is-harmony',harmony);
+  $('#answer-prompt').classList.toggle('is-hidden',!harmony);
+  $('#answer-grid').innerHTML=state.question.choiceOptions.map((option,index)=>harmony?
+    `<button data-answer="${option.id}"><kbd>${index+1}</kbd><span>${option.name}</span></button>`:
+    `<button data-answer="${option.id}"><span>${option.name}${option.subtitle?`<small>${option.subtitle}</small>`:''}</span></button>`).join('');
   $$('#answer-grid button').forEach(button=>button.addEventListener('click',()=>submitAnswer(button.dataset.answer,button)));
 }
 
@@ -381,7 +390,7 @@ function cancelSamplePlayback(){
   state.playbackTimers.forEach(clearTimeout);state.playbackTimers=[];
   Object.values(state.soundfontPlayers).forEach(player=>player.cancelQueue().catch(()=>{}));
   if(state.fallbackOutput){state.fallbackOutput.gain.value=0;state.fallbackOutput.disconnect();state.fallbackOutput=null}
-  $$('.review-zone.is-playing,.score-note.is-playing,.jazz-zone.is-playing,.jazz-chord.is-playing').forEach(node=>node.classList.remove('is-playing'));
+  $$('.review-zone.is-playing,.score-note.is-playing,.jazz-score-row.is-playing,.jazz-progression-chord.is-playing,.jazz-harmony-choice.is-playing').forEach(node=>node.classList.remove('is-playing'));
   setPromptPlayback('idle');
   state.audioBusy=false;
 }
@@ -494,7 +503,7 @@ async function startPlayback(type,group='correct',noteIndex=0,automatic=false){
   queueVisual(token,duration,()=>{
     state.audioBusy=false;setPromptPlayback('idle');
     $$('.review-zone.is-playing,.score-note.is-playing').forEach(node=>node.classList.remove('is-playing'));
-    if(state.locked)playbackStatus('可再次试听，准备好后进入下一题');else playbackStatus('请选择答案');
+    if(state.locked)playbackStatus('');else playbackStatus('请选择答案');
   });
 }
 
@@ -525,9 +534,10 @@ async function startJazzPlayback(type,group='correct',chordIndex=0,automatic=fal
       else player.queueWaveTable(at,midi,settings.chordDuration,settings.chordVolume);
     });
     if(state.locked)queueVisual(token,offset,()=>{
-      $$('.jazz-zone.is-playing,.jazz-chord.is-playing').forEach(node=>node.classList.remove('is-playing'));
-      const panel=document.querySelector(`.jazz-zone[data-zone="${zone}"]`);
-      panel?.classList.add('is-playing');panel?.querySelector(`.jazz-chord[data-chord="${index}"]`)?.classList.add('is-playing');
+    $$('.jazz-score-row.is-playing,.jazz-progression-chord.is-playing,.jazz-harmony-choice.is-playing').forEach(node=>node.classList.remove('is-playing'));
+      const panel=document.querySelector(`.jazz-score-row[data-zone="${zone}"]`);
+      panel?.classList.add('is-playing');panel?.querySelector(`.jazz-progression-chord[data-chord="${index}"]`)?.classList.add('is-playing');
+      document.querySelectorAll(`.jazz-harmony-choice[data-chord="${index}"][data-zone="${zone}"],.jazz-harmony-choice[data-chord="${index}"][data-zone="shared"]`).forEach(node=>node.classList.add('is-playing'));
       playbackStatus(`正在听：${zone==='mine'?'我的答案':'正确答案'} · 第 ${index+1} 个和弦`);
     });
   }
@@ -540,8 +550,8 @@ async function startJazzPlayback(type,group='correct',chordIndex=0,automatic=fal
   if(!state.locked){setPromptPlayback('playing');playbackStatus(usedFallback?'正在播放备用音色':'正在播放题目')}
   queueVisual(token,duration,()=>{
     state.audioBusy=false;setPromptPlayback('idle');
-    $$('.jazz-zone.is-playing,.jazz-chord.is-playing').forEach(node=>node.classList.remove('is-playing'));
-    playbackStatus(state.locked?'可再次试听，准备好后进入下一题':'请选择答案');
+    $$('.jazz-score-row.is-playing,.jazz-progression-chord.is-playing,.jazz-harmony-choice.is-playing').forEach(node=>node.classList.remove('is-playing'));
+    playbackStatus(state.locked?'':'请选择答案');
   });
 }
 
@@ -549,6 +559,7 @@ function ensureSessionStarted(){if(state.startedAt)return;state.startedAt=Date.n
 
 function submitAnswer(answerId,button){
   if(state.locked||!state.question)return;ensureSessionStarted();state.locked=true;
+  $('#train-view').classList.toggle('is-reviewing',state.sessionConfig.mode!=='interval');
   state.selectedAnswer=answerId;cancelSamplePlayback();
   const correct=answerId===state.question.id;const elapsed=Date.now()-state.questionStartedAt;
   if(correct)state.correct++;state.streak=correct?state.streak+1:0;state.maxStreak=Math.max(state.maxStreak,state.streak);
@@ -559,7 +570,9 @@ function submitAnswer(answerId,button){
       chordQualities:state.question.chords.map(chord=>chord.quality),voicingMode:state.question.voicingMode,replays:state.question.replays}: {})});
   $$('#answer-grid button').forEach(item=>{item.disabled=true;if(item.dataset.answer===state.question.id)item.classList.add('correct')});
   if(!correct)button.classList.add('wrong');
-  $('#feedback-bar').className=`feedback-bar ${correct?'is-correct':'is-wrong'}`;$('#feedback-text').textContent=correct?`正确 · ${state.question.name}`:`答案是 ${state.question.name}`;updateLiveStats();renderReview(correct);
+  if(state.sessionConfig.mode==='jazz')$('#feedback-bar').className='feedback-bar is-hidden';
+  else{$('#feedback-bar').className=`feedback-bar ${correct?'is-correct':'is-wrong'}`;$('#feedback-text').textContent=correct?`正确 · ${state.question.name}`:`答案是 ${state.question.name}`}
+  updateLiveStats();renderReview(correct);
 }
 
 function nextQuestion(){

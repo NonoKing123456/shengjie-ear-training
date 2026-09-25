@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#08151b" />
     <title>声阶 · Ear Training</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2308151b'/%3E%3Cpath d='M13 35h7l5-16 8 30 6-22 5 8h7' fill='none' stroke='%23c9ff55' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=tonality-first-3" />
     <style>
       .app-shell{width:min(980px,100%)}
       .setup-layout{grid-template-columns:minmax(0,1fr) 260px}
@@ -46,8 +46,9 @@
     <script src="./assets/soundfonts/violin.js" defer></script>
     <script src="./piano-sampler.js" defer></script>
     <script src="./jazz.js" defer></script>
-    <script src="./jazz-notation.js" defer></script>
-    <script src="./app.js" defer></script>
+    <script src="./vendor/vexflow/vexflow.js" defer></script>
+    <script src="./jazz-notation.js?v=equal-chord-hit-2" defer></script>
+    <script src="./app.js?v=tonality-first-1" defer></script>
     <script src="./review.js" defer></script>
   </head>
   <body>
@@ -221,8 +222,10 @@
           <div class="test-layout">
             <section class="question-card">
               <div class="question-head"><div><p class="eyebrow" id="question-kicker"></p><h1 id="question-title"></h1><p id="question-note"></p></div><div class="question-count"><strong id="question-number">1</strong><span id="question-total">/ 10</span></div></div>
+              <h1 class="question-tonality is-hidden" id="question-tonality"></h1>
               <div class="sound-stage" id="sound-stage"><button type="button" class="stage-prompt" id="play-question" aria-label="重听题目"><span class="staff-lines" aria-hidden="true"></span><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="stage-center"><span class="stage-play-symbol" data-play-symbol aria-hidden="true">▶</span><strong data-play-label>点击重听题目</strong><small>空格键也可重听</small></span><span class="stage-corner" aria-hidden="true">LISTEN / REPLAY</span></button><div class="review-content is-hidden" id="review-content"></div></div>
               <div class="feedback-bar" id="feedback-bar" role="status" aria-live="polite"><span>♪</span><b id="feedback-text">听完题目后选择答案</b></div>
+              <p class="answer-prompt is-hidden" id="answer-prompt">选择你听到的进行</p>
               <div class="answer-grid" id="answer-grid"></div>
             </section>
             <aside class="live-panel">

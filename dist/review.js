@@ -70,24 +70,25 @@ function reviewZone(zone,label,interval,notes,direction){
   </section>`;
 }
 
-function jazzZone(zone,item){
-  const correct=zone==='correct';
-  return `<section class="jazz-zone ${correct?'is-correct':'is-mine'}" data-zone="${zone}" aria-label="${correct?'正确答案':'我的答案'}">
-    <div class="review-zone-title"><strong>${correct?'✓ 正确答案':'○ 我的答案'}</strong><span>${item.name}</span></div>
-    <div class="jazz-chord-list">${item.voicings.map((chord,index)=>`<button type="button" class="jazz-chord" data-zone="${zone}" data-chord="${index}" aria-label="单独听第 ${index+1} 个和弦 ${chord.symbol}"><span class="jazz-chord-order">${String(index+1).padStart(2,'0')}</span><strong>${chord.symbol}</strong>${JazzNotation.svg(chord)}</button>`).join('')}</div>
-    <div class="review-zone-actions"><button type="button" data-play="${zone}">重听${correct?'正确进行':'我的答案'}</button></div>
-  </section>`;
-}
-
 function renderJazzReview(correct){
   const panel=$('#review-content'),question=state.question;
   const actual=question.options.find(option=>option.id===question.id);
-  const mine=question.options.find(option=>option.id===state.selectedAnswer);
+  const mine=question.options.find(option=>option.id===state.selectedAnswer)||actual;
+  const differences=Array.from({length:Math.max(actual.voicings.length,mine.voicings.length)},(_,index)=>{
+    const a=actual.voicings[index]?.symbol,m=mine?.voicings?.[index]?.symbol;
+    return a===m?null:{index,correct:a||'缺少',mine:m||'多出'};
+  }).filter(Boolean);
+  const differenceMap=Array.from({length:actual.voicings.length},(_,index)=>differences.some(item=>item.index===index));
+  const layout=JazzNotation.progressionLayout([actual.voicings,mine.voicings]);
   const nextLabel=state.index===state.sessionConfig.questionCount-1?'查看本轮结果 →':'下一题 →';
-  panel.innerHTML=`<div class="review-heading ${correct?'is-correct':'is-wrong'}"><strong>${correct?'✓ 回答正确':'✕ 这题答错了'}</strong><span>${question.keyName} ${tonalityNames[question.tonality]} · ${correct?actual.name:`我的答案：${mine.name}`}</span></div>
-    <div class="jazz-zones">${jazzZone('correct',actual)}${correct?'':jazzZone('mine',mine)}</div>
-    <div class="review-footer"><div class="review-footer-actions"><button type="button" data-play="question">再听一次题目</button>${correct?'':'<button type="button" data-play="ab">AB 对比播放</button>'}</div><button type="button" class="review-next" data-next>${nextLabel}</button></div>
-    <p class="review-playback-status" id="review-playback-status" role="status" aria-live="polite">点击任意和弦单独试听 · 空格键重听原题</p>`;
+  const firstDifference=differences[0];
+  const score=JazzNotation.reviewScore(actual.voicings,correct?null:mine.voicings,differenceMap,layout);
+  panel.innerHTML=`<div class="review-heading ${correct?'is-correct':'is-wrong'}"><strong>${correct?'✓ 答对了':`✕ 答错了 · 第 ${firstDifference.index+1} 个和弦不同`}</strong><span>${state.index+1} / ${state.sessionConfig.questionCount} · ${question.keyName} ${tonalityNames[question.tonality]}</span></div>
+    <div class="jazz-review-score-scroll"><div class="jazz-review-score-canvas" style="--jazz-score-width:${layout.width}px"><div class="jazz-harmony-rail-host"></div>${score}</div></div>
+    <div class="review-footer"><button type="button" class="review-next" data-next>${nextLabel}</button></div>
+    <span class="sr-only" id="review-playback-status" role="status" aria-live="polite"></span>`;
+  const engravedLayout=JazzNotation.mountReviewScores(panel)||layout;
+  panel.querySelector('.jazz-harmony-rail-host').innerHTML=JazzNotation.harmonyRail(actual.voicings,mine.voicings,differenceMap,engravedLayout);
 }
 
 function renderReview(correct){
@@ -109,13 +110,27 @@ function renderReview(correct){
 }
 
 $('#review-content').addEventListener('click',event=>{
-  const target=event.target.closest('[data-next],[data-play],.score-note,.jazz-chord');if(!target)return;
+  const target=event.target.closest('[data-next],[data-play],.score-note,.jazz-harmony-choice,.jazz-progression-chord,.jazz-score-row');if(!target)return;
   if(target.hasAttribute('data-next')){nextQuestion();return}
   if(target.classList.contains('score-note')){void startPlayback('single',target.dataset.zone,Number(target.dataset.note));return}
-  if(target.classList.contains('jazz-chord')){void startPlayback('single',target.dataset.zone,Number(target.dataset.chord));return}
+  if(target.classList.contains('jazz-harmony-choice')){void startPlayback('single',target.dataset.zone==='shared'?'correct':target.dataset.zone,Number(target.dataset.chord));return}
+  if(target.classList.contains('jazz-progression-chord')){void startPlayback('single',target.dataset.zone,Number(target.dataset.chord));return}
+  if(target.classList.contains('jazz-score-row')){void startPlayback(target.dataset.zone,target.dataset.zone);return}
   void startPlayback(target.dataset.play,target.dataset.zone||'correct',Number(target.dataset.note||0));
 });
 $('#review-content').addEventListener('keydown',event=>{
   const note=event.target.closest('.score-note');if(!note||event.code!=='Enter')return;
   event.preventDefault();event.stopPropagation();void startPlayback('single',note.dataset.zone,Number(note.dataset.note));
+});
+$('#review-content').addEventListener('keydown',event=>{
+  const chord=event.target.closest('.jazz-harmony-choice');if(!chord||!['Enter','Space'].includes(event.code))return;
+  event.preventDefault();event.stopPropagation();void startPlayback('single',chord.dataset.zone==='shared'?'correct':chord.dataset.zone,Number(chord.dataset.chord));
+});
+$('#review-content').addEventListener('keydown',event=>{
+  const chord=event.target.closest('.jazz-progression-chord');if(!chord||!['Enter','Space'].includes(event.code))return;
+  event.preventDefault();event.stopPropagation();void startPlayback('single',chord.dataset.zone,Number(chord.dataset.chord));
+});
+$('#review-content').addEventListener('keydown',event=>{
+  const row=event.target.closest('.jazz-score-row');if(!row||event.target!==row||!['Enter','Space'].includes(event.code))return;
+  event.preventDefault();event.stopPropagation();void startPlayback(row.dataset.zone,row.dataset.zone);
 });
