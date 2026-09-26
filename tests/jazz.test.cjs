@@ -34,7 +34,10 @@ test('voicings retain guide tones and make the requested rootless choice',()=>{
       const guide=chord.quality==='°7'||chord.quality==='m6'?[tones[1],tones[3]]:[tones[1],tones[3]];
       for(const interval of guide)assert.ok(chord.right.some(note=>(note-chord.root-interval)%12===0));
       if(mode==='rootless')assert.equal(chord.bass,null);
-      else assert.equal(chord.notes[0],36+chord.root);
+      else{
+        assert.equal(chord.notes[0]%12,chord.root);
+        assert.ok(chord.notes[0]>=43);
+      }
       assert.ok(chord.right.every(note=>note>=55&&note<=81));
     }
   }

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#08151b" />
     <title>声阶 · Ear Training</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2308151b'/%3E%3Cpath d='M13 35h7l5-16 8 30 6-22 5 8h7' fill='none' stroke='%23c9ff55' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="./styles.css?v=review-hit-unified-3" />
+    <link rel="stylesheet" href="./styles.css?v=notation-choice-1" />
     <style>
       .app-shell{width:min(980px,100%)}
       .setup-layout{grid-template-columns:minmax(0,1fr) 260px}
@@ -52,12 +52,12 @@
     <script src="./assets/soundfonts/clarinet.js" defer></script>
     <script src="./assets/soundfonts/bassoon.js" defer></script>
     <script src="./piano-sampler.js" defer></script>
-    <script src="./jazz.js" defer></script>
-    <script src="./chord-style-packs.js?v=style-packs-4" defer></script>
+    <script src="./jazz.js?v=chord-vocabulary-1" defer></script>
+    <script src="./chord-style-packs.js?v=pop-packs-2" defer></script>
     <script src="./vendor/vexflow/vexflow.js" defer></script>
-    <script src="./jazz-notation.js?v=stave-barline-1" defer></script>
+    <script src="./jazz-notation.js?v=pop-packs-2" defer></script>
     <script src="./melody.js?v=stave-barline-1" defer></script>
-    <script src="./app.js?v=note-glow-2" defer></script>
+    <script src="./app.js?v=pop-packs-2" defer></script>
     <script src="./review.js?v=stave-barline-1" defer></script>
   </head>
   <body>
@@ -147,9 +147,16 @@
                 <section class="setup-section">
                   <div class="section-title"><span>03</span><div><h2>风格包</h2><p>本轮只使用所选风格的和弦、连接与配位</p></div></div>
                   <div class="choice-cards style-pack-cards" id="style-pack-options" role="radiogroup" aria-label="和弦风格包">
-                    <button type="button" class="choice-card" data-style-pack="pop" role="radio"><strong>流行</strong><small>常见四和弦循环与稳定三和弦配位</small></button>
+                    <button type="button" class="choice-card" data-style-pack="pop" role="radio"><strong>流行</strong><small>调内三和弦与可选流行色彩</small></button>
                     <button type="button" class="choice-card" data-style-pack="jazz" role="radio"><strong>爵士</strong><small>七和弦、功能连接与爵士钢琴配位</small></button>
                     <button type="button" class="choice-card" data-style-pack="classical" role="radio"><strong>古典</strong><small>调内功能、转位、终止与受控调外和声</small></button>
+                  </div>
+                </section>
+                <section class="setup-section">
+                  <div class="section-title"><span>04</span><div><h2>和弦记法</h2><p>选择答案选项与复盘上方的和弦名称</p></div></div>
+                  <div class="choice-cards chord-notation-cards" id="chord-notation-options" role="radiogroup" aria-label="和弦记法">
+                    <button type="button" class="choice-card" data-chord-notation="letters" role="radio"><strong>和弦符号</strong><small>按实际音名 · C – Am – F – G</small></button>
+                    <button type="button" class="choice-card" data-chord-notation="roman" role="radio"><strong>罗马数字分析</strong><small>按调内级数 · I – vi – IV – V</small></button>
                   </div>
                 </section>
               </div>
@@ -162,23 +169,35 @@
                   </div>
                 </section>
                 <section class="setup-section">
-                  <div class="section-title"><span>04</span><div><h2>调式</h2><p>每轮进入前必须选择大调或小调</p></div></div>
+                  <div class="section-title"><span>05</span><div><h2>调式</h2><p>每轮进入前必须选择大调或小调</p></div></div>
                   <div class="segmented" id="tonality-options"><button class="is-selected" data-tonality="major">大调</button><button data-tonality="minor">小调</button></div>
                 </section>
                 <section class="setup-section">
-                  <div class="section-title"><span>05</span><div><h2>调性中心</h2><p>可多选，题目会在所选主音上随机移调</p></div><strong class="selection-count" id="key-count">3 个调性</strong></div>
+                  <div class="section-title"><span>06</span><div><h2>调性中心</h2><p>可多选，题目会在所选主音上随机移调</p></div><strong class="selection-count" id="key-count">3 个调性</strong></div>
                   <div class="token-grid keys" id="key-options" aria-label="选择调性中心"></div>
                   <div class="micro-actions"><button id="select-all-keys">全部选择</button><button id="clear-keys">清空</button></div>
                 </section>
+                <section class="setup-section is-hidden" id="pop-pack-section">
+                  <div class="section-title"><span>07</span><div><h2>流行和弦语汇</h2><p>调内三和弦必选；按需加入其他和弦</p></div></div>
+                  <div class="jazz-pack-list pop-pack-list" id="pop-pack-options">
+                    <button type="button" data-pop-pack="diatonic" aria-disabled="true"><strong>调内三和弦（必选）</strong><small>大调与小调的常见四和弦循环</small></button>
+                    <button type="button" data-pop-pack="suspended"><strong>挂留和弦</strong><small>sus4、属七 sus4</small></button>
+                    <button type="button" data-pop-pack="seventh"><strong>七和弦</strong><small>大七、小七、属七与半减七</small></button>
+                    <button type="button" data-pop-pack="add"><strong>Add／6·9 和弦</strong><small>大三 add6、6/9、小三 add2 等</small></button>
+                    <button type="button" data-pop-pack="inversions"><strong>转位和弦</strong><small>斜杠低音与较平稳的低音线条</small></button>
+                    <button type="button" data-pop-pack="modalBorrowing"><strong>调式借用</strong><small>平行调色彩 · iv、♭VI、IV 等</small></button>
+                    <button type="button" data-pop-pack="secondaryDominant"><strong>副属和弦</strong><small>V7/V、V7/vi 等，接续目标和弦</small></button>
+                  </div>
+                </section>
                 <section class="setup-section is-hidden" id="classical-voicing-section">
-                  <div class="section-title"><span>06</span><div><h2>古典配位</h2><p>整轮题目与所有选项采用同一种声部写法</p></div></div>
+                  <div class="section-title"><span>07</span><div><h2>古典配位</h2><p>整轮题目与所有选项采用同一种声部写法</p></div></div>
                   <div class="choice-cards" id="classical-voicing-options" role="radiogroup" aria-label="古典配位">
                     <button type="button" class="choice-card" data-classical-voicing="keyboard" role="radio"><strong>键盘配位</strong><small>低音加紧密上三声部，保留当前听感</small></button>
                     <button type="button" class="choice-card" data-classical-voicing="satb" role="radio"><strong>SATB 四声部</strong><small>女高、女低、男高、男低独立连接</small></button>
                   </div>
                 </section>
                 <section class="setup-section" id="generated-harmony-section">
-                  <div class="section-title"><span>07</span><div><h2>可加入的调外和声</h2><p>调内和弦始终可用；勾选后，系统会把这些和弦插入并导向合理解决</p></div><strong class="selection-count" id="chromatic-count"></strong></div>
+                  <div class="section-title"><span>08</span><div><h2>可加入的调外和声</h2><p>调内和弦始终可用；勾选后，系统会把这些和弦插入并导向合理解决</p></div><strong class="selection-count" id="chromatic-count"></strong></div>
                   <div class="harmony-list" id="chromatic-harmony-options"></div>
                 </section>
                 <section class="setup-section is-hidden" id="warmup-explanation">
@@ -189,11 +208,11 @@
 
               <div class="is-hidden" id="jazz-settings">
                 <section class="setup-section">
-                  <div class="section-title"><span>04</span><div><h2>爵士调性环境</h2><p>大调与小调使用各自的功能和声库，分开记录成绩</p></div></div>
+                  <div class="section-title"><span>05</span><div><h2>爵士调性环境</h2><p>大调与小调使用各自的功能和声库，分开记录成绩</p></div></div>
                   <div class="segmented" id="jazz-tonality-options"><button data-jazz-tonality="major">大调</button><button data-jazz-tonality="minor">小调</button></div>
                 </section>
                 <section class="setup-section">
-                  <div class="section-title"><span>05</span><div><h2>可用和声语汇</h2><p>语汇包可叠加；未选择的内容不会出现在题目和选项中</p></div></div>
+                  <div class="section-title"><span>06</span><div><h2>可用和声语汇</h2><p>语汇包可叠加；未选择的内容不会出现在题目和选项中</p></div></div>
                   <div class="jazz-pack-list" id="jazz-pack-options">
                     <button type="button" data-jazz-pack="basic" aria-disabled="true"><strong>基础 · 标准曲骨架（必选）</strong><small>调内七和弦、ii–V–I 与传统小调终止</small></button>
                     <button type="button" data-jazz-pack="secondary"><strong>进阶 · 属功能扩张</strong><small>次属、连续属和弦；小调 V7♭9</small></button>
@@ -201,12 +220,12 @@
                   </div>
                 </section>
                 <section class="setup-section">
-                  <div class="section-title"><span>06</span><div><h2>调性中心</h2><p>可多选，每题在所选调性中心随机移调</p></div><strong class="selection-count" id="jazz-key-count"></strong></div>
+                  <div class="section-title"><span>07</span><div><h2>调性中心</h2><p>可多选，每题在所选调性中心随机移调</p></div><strong class="selection-count" id="jazz-key-count"></strong></div>
                   <div class="token-grid keys" id="jazz-key-options" aria-label="选择爵士调性中心"></div>
                   <div class="micro-actions"><button type="button" id="jazz-select-all-keys">全部选择</button><button type="button" id="jazz-clear-keys">清空</button></div>
                 </section>
                 <section class="setup-section">
-                  <div class="section-title"><span>07</span><div><h2>钢琴配位</h2><p>整段统一优化声部连接，节奏保持等时</p></div></div>
+                  <div class="section-title"><span>08</span><div><h2>钢琴配位</h2><p>整段统一优化声部连接，节奏保持等时</p></div></div>
                   <div class="jazz-voicing-list" id="jazz-voicing-options">
                     <button type="button" data-jazz-voicing="training"><strong>训练型爵士钢琴</strong><small>低音根音 + 右手三音、七音与自然色彩</small></button>
                     <button type="button" data-jazz-voicing="shell"><strong>Shell Voicing</strong><small>低音根音 + 三音、七音</small></button>

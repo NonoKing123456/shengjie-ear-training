@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'shengjie-ear-training-history-v1';
+const chordNotationNames={letters:'和弦符号',roman:'罗马数字分析'};
 
 const intervalBank = [
   { id:'m2', name:'小二度', semitones:1 }, { id:'M2', name:'大二度', semitones:2 },
@@ -107,7 +108,7 @@ const config = {
   startMode:'random', fixedPitch:0, fixedOctave:4,
   intervalDirection:'ascending', intervalPlayback:'sequential',
   intervals:[...difficultyPresets.standard.intervals],
-  chordMode:'generated', stylePack:'pop', tonality:'major', keys:[0,2,7],classicalColors:['V5','N6','ger6'],classicalVoicing:'keyboard',
+  chordMode:'generated', stylePack:'pop', chordNotation:'letters',popPacks:['diatonic'],tonality:'major', keys:[0,2,7],classicalColors:['V5','N6','ger6'],classicalVoicing:'keyboard',
   jazzTonality:'major', jazzPacks:['basic'], jazzVoicing:'training',
   chromaticHarmonies:['V3','V5','N6'],
   melodyEnvironment:'major',melodyLength:5,melodyRange:7,melodyKeys:[0,2,7]
@@ -195,6 +196,8 @@ function syncConfigUI(){
   $('#difficulty-section-title').textContent=isChord||isMelody?'题量':'难度与题量';
   $('#difficulty-section-help').textContent=isMelody?'旋律环境、长度与音域在下方单独选择':isChord?'和弦范围在风格包内选择':'难度会为训练内容应用一组推荐预设';
   $$('#style-pack-options button').forEach(button=>{const selected=button.dataset.stylePack===config.stylePack;button.classList.toggle('is-selected',selected);button.setAttribute('aria-checked',String(selected))});
+  $$('#chord-notation-options button').forEach(button=>{const selected=button.dataset.chordNotation===config.chordNotation;button.classList.toggle('is-selected',selected);button.setAttribute('aria-checked',String(selected))});
+  $$('#pop-pack-options button').forEach(button=>{const selected=config.popPacks.includes(button.dataset.popPack);button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected))});
   $$('#question-count-options button').forEach(button=>button.classList.toggle('is-selected',Number(button.dataset.count)===config.questionCount));
   $$('#instrument-options button').forEach(button=>{
     const instrument=button.dataset.instrument;
@@ -235,13 +238,14 @@ function syncConfigUI(){
   $('#interval-settings').classList.toggle('is-hidden',!isInterval);
   $('#style-pack-settings').classList.toggle('is-hidden',!isChord);
   $('#chord-settings').classList.toggle('is-hidden',!isChord||isJazz);
+  $('#pop-pack-section').classList.toggle('is-hidden',!isChord||config.stylePack!=='pop');
   $('#classical-voicing-section').classList.toggle('is-hidden',!isChord||config.stylePack!=='classical');
   $('#jazz-settings').classList.toggle('is-hidden',!isJazz);
   $('#melody-settings').classList.toggle('is-hidden',!isMelody);
   $('#fixed-start-panel').classList.toggle('is-hidden',config.startMode!=='fixed');
   $('#generated-harmony-section').classList.toggle('is-hidden',!isChord||config.stylePack!=='classical');
   $('#warmup-explanation').classList.add('is-hidden');
-  $('#instrument-step').textContent=isInterval?'06':isMelody?(config.melodyEnvironment==='atonal'?'05':'06'):isChord?(isJazz?'08':config.stylePack==='classical'?'08':'06'):'06';
+  $('#instrument-step').textContent=isInterval?'06':isMelody?(config.melodyEnvironment==='atonal'?'05':'06'):isChord?(isJazz||config.stylePack==='classical'?'09':'08'):'06';
   $('#interval-count').textContent=`已选 ${config.intervals.length} 个`;
   $('#key-count').textContent=`${config.keys.length} 个调性`;
   $('#jazz-key-count').textContent=`${config.keys.length} 个调性`;
@@ -255,7 +259,7 @@ function renderConfigSummary(){
     config.mode==='melody'?
     [['内容','旋律听写'],['环境',MelodyTrainer.ENV_NAMES[config.melodyEnvironment]],['调性中心',config.melodyEnvironment==='atonal'?'不设调性':`${config.melodyKeys.length} 个`],['长度',`${config.melodyLength} 音，首音已给出`],['音域',config.melodyRange===7?'五度内':'八度内'],['音色',instrumentNames[config.instrument]],['题量',`${config.questionCount} 题`]]:
     config.mode==='chordProgression'?
-    [['内容','和弦进行'],['风格',ChordStylePacks.names[config.stylePack]],['调式',tonalityNames[config.stylePack==='jazz'?config.jazzTonality:config.tonality]],['调性中心',`${config.keys.length} 个`],...(config.stylePack==='jazz'?[['语汇包',config.jazzPacks.map(pack=>jazzPackNames[pack]).join(' + ')],['配位',jazzVoicingNames[config.jazzVoicing]]]:config.stylePack==='classical'?[['配位',config.classicalVoicing==='satb'?'SATB 四声部':'键盘配位'],['调外和声',`${config.classicalColors.length} 个可用`]]:[]),['音色',instrumentNames[config.instrument]],['题量',`${config.questionCount} 题`]]:[];
+    [['内容','和弦进行'],['风格',ChordStylePacks.names[config.stylePack]],['记法',chordNotationNames[config.chordNotation]],['调式',tonalityNames[config.stylePack==='jazz'?config.jazzTonality:config.tonality]],['调性中心',`${config.keys.length} 个`],...(config.stylePack==='jazz'?[['语汇包',config.jazzPacks.map(pack=>jazzPackNames[pack]).join(' + ')],['配位',jazzVoicingNames[config.jazzVoicing]]]:config.stylePack==='classical'?[['配位',config.classicalVoicing==='satb'?'SATB 四声部':'键盘配位'],['调外和声',`${config.classicalColors.length} 个可用`]]:[['语汇包',config.popPacks.length===1?'调内三和弦':`调内三和弦 + ${config.popPacks.length-1} 个扩展`]]),['音色',instrumentNames[config.instrument]],['题量',`${config.questionCount} 题`]]:[];
   $('#config-summary').innerHTML=rows.map(([term,value])=>`<div><dt>${term}</dt><dd>${value}</dd></div>`).join('');
 }
 
@@ -271,10 +275,11 @@ function validateConfig(){
   if(config.mode==='melody'&&config.melodyEnvironment!=='atonal'&&!config.melodyKeys.length)return '请至少选择一个旋律调性中心。';
   if(config.mode==='chordProgression'){
     if(!config.keys.length)return '请至少选择一个调性中心。';
+    if(!['letters','roman'].includes(config.chordNotation))return '请选择有效的和弦标记方式。';
     if(config.stylePack==='classical'&&!['keyboard','satb'].includes(config.classicalVoicing))return '请选择有效的古典配位。';
     if(config.stylePack==='jazz'){
       if(!JazzTrainer.paths(config.jazzTonality,config.jazzPacks).length)return '当前爵士语汇不足以生成有效题目。';
-    }else return ChordStylePacks.validate({stylePack:config.stylePack,tonality:config.tonality,selectedColors:config.classicalColors});
+    }else return ChordStylePacks.validate({stylePack:config.stylePack,tonality:config.tonality,selectedColors:config.classicalColors,popPacks:config.popPacks});
   }
   return '';
 }
@@ -335,10 +340,18 @@ function validateStyledQuestion(question,stylePack){
   for(const option of question.options){
     if(option.voicings.length!==length||option.name!==option.voicings.map(chord=>chord.symbol).join(' – '))throw new Error('和弦名称与实际配位不一致，请调整设置后重试。');
     for(const chord of option.voicings){
+      if(chord.notes.some(midi=>midi<43))throw new Error('和弦低音超出 G2 下限，请调整设置后重试。');
       const engraved=['bass','treble'].flatMap(clef=>JazzNotation.vexVoicing(chord,clef).map(note=>note.midi)).sort((a,b)=>a-b);
       const sounding=[...chord.notes].sort((a,b)=>a-b);
       if(engraved.length!==sounding.length||engraved.some((midi,index)=>midi!==sounding[index]))throw new Error('谱面与实际发声音符不一致，请调整设置后重试。');
     }
+  }
+}
+
+function applyChordNotation(question,notation){
+  for(const option of question.options){
+    option.voicings.forEach(chord=>{chord.displaySymbol=JazzNotation.chordDisplaySymbol(chord,notation,question)});
+    option.displayName=option.voicings.map(chord=>chord.displaySymbol).join(' – ');
   }
 }
 
@@ -373,9 +386,10 @@ function newQuestion(){
     state.question=session.stylePack==='jazz'?
       JazzTrainer.chooseQuestion({tonality:session.jazzTonality,packs:session.jazzPacks,key,voicingMode:session.jazzVoicing,previousId:state.lastQuestionId}):
       ChordStylePacks.chooseQuestion({stylePack:session.stylePack,tonality:session.tonality,key,selectedColors:session.classicalColors,
-        voiceMode:session.stylePack==='classical'?session.classicalVoicing:'keyboard',previousId:state.lastQuestionId});
+        popPacks:session.popPacks,voiceMode:session.stylePack==='classical'?session.classicalVoicing:'keyboard',previousId:state.lastQuestionId});
     state.question.stylePack=session.stylePack;
     validateStyledQuestion(state.question,session.stylePack);
+    applyChordNotation(state.question,session.chordNotation);
     state.lastQuestionId=state.question.id;
     state.question.replays={question:0,correct:0,mine:0,ab:0};
   }else state.question=state.sessionConfig.mode==='interval'?intervalQuestion(state.sessionConfig):chordQuestion(state.sessionConfig);
@@ -386,7 +400,7 @@ function renderSessionTags(){
   const session=state.sessionConfig;const tags=session.mode==='interval'?
     ['音程辨认',difficultyNames[session.difficulty],session.startMode==='random'?'随机起始音':`固定 ${keys.find(item=>item.value===session.fixedPitch).name}${session.fixedOctave}`,session.intervalPlayback==='simultaneous'?'方向不适用':intervalDirectionNames[session.intervalDirection],session.intervalPlayback==='simultaneous'?'同时发声':'依次发声',intervalRangeLabel(session.intervals),instrumentNames[session.instrument]]:
     session.mode==='melody'?['旋律听写',MelodyTrainer.ENV_NAMES[session.melodyEnvironment],`${session.melodyLength} 音`,session.melodyRange===7?'五度内':'八度内',instrumentNames[session.instrument]]:
-    session.mode==='chordProgression'?['和弦进行',ChordStylePacks.names[session.stylePack],tonalityNames[session.stylePack==='jazz'?session.jazzTonality:session.tonality],...(session.stylePack==='jazz'?[session.jazzPacks.map(pack=>`${jazzPackNames[pack]}包`).join(' + '),jazzVoicingNames[session.jazzVoicing]]:session.stylePack==='classical'?[session.classicalVoicing==='satb'?'SATB 四声部':'键盘配位']:[]),instrumentNames[session.instrument]]:[];
+    session.mode==='chordProgression'?['和弦进行',ChordStylePacks.names[session.stylePack],chordNotationNames[session.chordNotation],tonalityNames[session.stylePack==='jazz'?session.jazzTonality:session.tonality],...(session.stylePack==='jazz'?[session.jazzPacks.map(pack=>`${jazzPackNames[pack]}包`).join(' + '),jazzVoicingNames[session.jazzVoicing]]:session.stylePack==='classical'?[session.classicalVoicing==='satb'?'SATB 四声部':'键盘配位']:[`${session.popPacks.length} 个语汇包`]),instrumentNames[session.instrument]]:[];
   $('#session-tags').innerHTML=tags.map(text=>`<span>${text}</span>`).join('');
 }
 
@@ -418,7 +432,7 @@ function renderQuestion(){
   $('#feedback-bar').classList.toggle('is-hidden',melody);
   if(melody){$('#answer-grid').innerHTML='';mountMelodyInput();return}
   $('#answer-grid').innerHTML=state.question.choiceOptions.map((option,index)=>harmony?
-    `<button data-answer="${option.id}"><kbd>${index+1}</kbd><span>${option.name}</span></button>`:
+    `<button data-answer="${option.id}"><kbd>${index+1}</kbd><span>${option.displayName||option.name}</span></button>`:
     `<button data-answer="${option.id}"><span>${option.name}${option.subtitle?`<small>${option.subtitle}</small>`:''}</span></button>`).join('');
   $$('#answer-grid button').forEach(button=>button.addEventListener('click',()=>submitAnswer(button.dataset.answer,button)));
 }
@@ -902,8 +916,9 @@ function submitAnswer(answerId,button){
   const correct=answerId===state.question.id;const elapsed=Date.now()-state.questionStartedAt;
   if(correct)state.correct++;state.streak=correct?state.streak+1:0;state.maxStreak=Math.max(state.maxStreak,state.streak);
   state.answers.push({question:state.question.id,answer:answerId,correct,elapsed,key:state.question.keyName,chromatic:Boolean(state.question.usedChromatic),
-    ...(state.sessionConfig.mode==='chordProgression'?{stylePack:state.sessionConfig.stylePack,jazzTonality:state.sessionConfig.stylePack==='jazz'?state.question.tonality:null,jazzPacks:state.sessionConfig.stylePack==='jazz'?[...state.sessionConfig.jazzPacks]:[],
+    ...(state.sessionConfig.mode==='chordProgression'?{stylePack:state.sessionConfig.stylePack,chordNotation:state.sessionConfig.chordNotation,popPacks:state.sessionConfig.stylePack==='pop'?[...state.sessionConfig.popPacks]:[],jazzTonality:state.sessionConfig.stylePack==='jazz'?state.question.tonality:null,jazzPacks:state.sessionConfig.stylePack==='jazz'?[...state.sessionConfig.jazzPacks]:[],
       correctSymbols:state.question.name,selectedSymbols:state.question.options.find(option=>option.id===answerId)?.name,
+      correctDisplay:state.question.options.find(option=>option.id===state.question.id)?.displayName,selectedDisplay:state.question.options.find(option=>option.id===answerId)?.displayName,
       correctTokens:[...state.question.tokens],selectedTokens:[...state.question.options.find(option=>option.id===answerId).tokens],
       chordQualities:state.question.chords.map(chord=>chord.quality),voicingMode:state.question.voicingMode||state.question.voiceMode||state.sessionConfig.stylePack,
       correctVoicings:state.question.voicings.map(chord=>chord.notes),selectedVoicings:state.question.options.find(option=>option.id===answerId).voicings.map(chord=>chord.notes),replays:state.question.replays}: {})});
@@ -940,7 +955,7 @@ function finishSession(){
     durationSeconds:Math.round((endedAt-state.startedAt)/1000),createdAt:new Date().toISOString(),instrument:state.sessionConfig.instrument,
     startMode:state.sessionConfig.startMode,fixedPitch:state.sessionConfig.fixedPitch,fixedOctave:state.sessionConfig.fixedOctave,
     intervalDirection:state.sessionConfig.intervalDirection,intervalPlayback:state.sessionConfig.intervalPlayback,
-    chordMode:state.sessionConfig.chordMode,tonality:state.sessionConfig.stylePack==='jazz'?state.sessionConfig.jazzTonality:state.sessionConfig.tonality,keys:state.sessionConfig.keys,classicalColors:state.sessionConfig.classicalColors,classicalVoicing:state.sessionConfig.classicalVoicing,
+    chordMode:state.sessionConfig.chordMode,chordNotation:state.sessionConfig.chordNotation,popPacks:state.sessionConfig.popPacks,tonality:state.sessionConfig.stylePack==='jazz'?state.sessionConfig.jazzTonality:state.sessionConfig.tonality,keys:state.sessionConfig.keys,classicalColors:state.sessionConfig.classicalColors,classicalVoicing:state.sessionConfig.classicalVoicing,
     intervals:state.sessionConfig.intervals,chromaticHarmonies:state.sessionConfig.chromaticHarmonies,
     jazzTonality:state.sessionConfig.jazzTonality,jazzPacks:state.sessionConfig.jazzPacks,jazzVoicing:state.sessionConfig.jazzVoicing,
     melodyEnvironment:state.sessionConfig.melodyEnvironment,melodyLength:state.sessionConfig.melodyLength,melodyRange:state.sessionConfig.melodyRange,melodyKeys:state.sessionConfig.melodyKeys,
@@ -1028,7 +1043,7 @@ function renderInsights({records,intervalRecords,progressionRecords,jazzRecords,
 
 function recordDetail(record){
   if(record.mode==='interval'){const direction=record.intervalDirection||(record.includeDescending?'mixed':'ascending');return `${record.startMode==='fixed'?'固定起始音':'随机起始音'} · ${record.intervalPlayback==='simultaneous'?'方向不适用':intervalDirectionNames[direction]} · ${record.intervalPlayback==='simultaneous'?'同时发声':'依次发声'}`}
-  if(record.mode==='chordProgression')return `${tonalityNames[record.tonality]||'大调'}${record.stylePack==='jazz'?` · ${(record.jazzPacks||[]).map(pack=>jazzPackNames[pack]).join(' + ')}包 · ${jazzVoicingNames[record.jazzVoicing]}`:record.stylePack==='classical'?` · ${record.classicalVoicing==='satb'?'SATB 四声部':'键盘配位'} · ${(record.classicalColors||[]).length} 种调外和声`:''}`;
+  if(record.mode==='chordProgression')return `${tonalityNames[record.tonality]||'大调'} · ${chordNotationNames[record.chordNotation]||chordNotationNames.letters}${record.stylePack==='jazz'?` · ${(record.jazzPacks||[]).map(pack=>jazzPackNames[pack]).join(' + ')}包 · ${jazzVoicingNames[record.jazzVoicing]}`:record.stylePack==='classical'?` · ${record.classicalVoicing==='satb'?'SATB 四声部':'键盘配位'} · ${(record.classicalColors||[]).length} 种调外和声`:` · ${(record.popPacks||['diatonic']).length} 个语汇包`}`;
   if(record.mode==='jazz')return `${tonalityNames[record.jazzTonality]} · ${(record.jazzPacks||[]).map(pack=>jazzPackNames[pack]).join(' + ')}包 · ${jazzVoicingNames[record.jazzVoicing]}`;
   if(record.mode==='melody')return `${MelodyTrainer.ENV_NAMES[record.melodyEnvironment]||'旋律'} · ${record.melodyLength||5} 音 · ${record.melodyRange===12?'八度内':'五度内'}`;
   if(record.chordMode)return `${chordModeNames[record.chordMode]||'和弦训练'} · ${tonalityNames[record.tonality]||'大调'}`;
@@ -1050,6 +1065,8 @@ function registerWebMCPTools(){
 function bindEvents(){
   $$('.mode-card').forEach(button=>button.addEventListener('click',()=>setTrainingMode(button.dataset.mode)));
   $$('#style-pack-options button').forEach(button=>button.addEventListener('click',()=>{config.stylePack=button.dataset.stylePack;syncConfigUI()}));
+  $$('#chord-notation-options button').forEach(button=>button.addEventListener('click',()=>{config.chordNotation=button.dataset.chordNotation;syncConfigUI()}));
+  $$('#pop-pack-options button').forEach(button=>button.addEventListener('click',()=>{const pack=button.dataset.popPack;if(pack==='diatonic')return;toggleArray(config.popPacks,pack)}));
   $$('#classical-voicing-options button').forEach(button=>button.addEventListener('click',()=>{config.classicalVoicing=button.dataset.classicalVoicing;syncConfigUI()}));
   $$('#difficulty-options button').forEach(button=>button.addEventListener('click',()=>setDifficulty(button.dataset.difficulty)));
   $$('#question-count-options button').forEach(button=>button.addEventListener('click',()=>{config.questionCount=Number(button.dataset.count);syncConfigUI()}));

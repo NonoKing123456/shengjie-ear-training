@@ -170,7 +170,8 @@ const JazzTrainer=(()=>{
     const voiced=new Array(chords.length);
     for(let step=chords.length-1;step>=0;step--){
       const chord=chords[step],right=[...candidates[step][index]];
-      const bass=36+chord.root;
+      const rawBass=36+chord.root;
+      const bass=rawBass<43?rawBass+12:rawBass;
       voiced[step]={...chord,bass:mode==='rootless'?null:bass,right,
         notes:mode==='rootless'?right:[bass,...right]};
       index=back[step]?.[index]??index;

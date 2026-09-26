@@ -7,6 +7,13 @@ const JazzNotation=(()=>{
     min:[[0,0],[3,2],[7,4]],
     dim:[[0,0],[3,2],[6,4]],
     ger6:[[0,0],[4,2],[7,4],[10,5]],
+    sus4:[[0,0],[5,3],[7,4]],
+    '7sus4':[[0,0],[5,3],[7,4],[10,6]],
+    majadd2:[[0,0],[2,1],[4,2],[7,4]],
+    majadd6:[[0,0],[4,2],[7,4],[9,5]],
+    maj69:[[0,0],[2,1],[4,2],[7,4],[9,5]],
+    minadd2:[[0,0],[2,1],[3,2],[7,4]],
+    minadd4:[[0,0],[3,2],[5,3],[7,4]],
     maj7:[[0,0],[4,2],[7,4],[11,6],[14,1],[21,5]],
     m7:[[0,0],[3,2],[7,4],[10,6],[14,1],[17,3],[21,5]],
     '7':[[0,0],[4,2],[7,4],[10,6],[14,1],[21,5]],
@@ -18,6 +25,30 @@ const JazzNotation=(()=>{
     '7♭13':[[0,0],[4,2],[7,4],[10,6],[14,1],[20,5]]
   };
   const notationStore=new Map();let notationId=0;
+
+  function popBassDegree(chord,context){
+    const bassName=chord.symbol.match(/\/([A-G][♭♯𝄫𝄪]?)$/)?.[1];
+    const tonicLetter=letters.indexOf(context.keyName?.[0]);
+    const bassLetter=letters.indexOf(bassName?.[0]);
+    if(tonicLetter<0||bassLetter<0||!Number.isInteger(context.key)||!Number.isInteger(chord.bass))throw new Error('无法确定流行转位的低音级数');
+    const degree=(bassLetter-tonicLetter+7)%7;
+    const scale=context.tonality==='minor'?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
+    const interval=((chord.bass-context.key)%12+12)%12;
+    let alteration=(interval-scale[degree]+12)%12;
+    if(alteration>6)alteration-=12;
+    const sign=({'-2':'𝄫','-1':'♭',0:'',1:'♯',2:'𝄪'})[alteration];
+    if(sign===undefined)throw new Error('流行转位的低音级数超出可标记范围');
+    return `${sign}${degree+1}`;
+  }
+
+  function chordDisplaySymbol(chord,notation,context){
+    if(notation!=='roman')return chord.symbol;
+    const token=chord.token;
+    const label=token==='subV7'?'♭II7':token==='ivm7'?'iv7':token;
+    if(context.stylePack==='pop'&&chord.inversion)return `${label.replace(/(?:64|6)$/,'')}/${popBassDegree(chord,context)}`;
+    if(context.stylePack==='classical'&&token!=='Ger+6')return label.replace(/64$/,'⁶₄').replace(/6$/,'⁶');
+    return label;
+  }
 
   function spell(chord,midi){
     const rootLetter=letters.indexOf(chord.rootLetter||chord.symbol[0]);
@@ -59,7 +90,7 @@ const JazzNotation=(()=>{
   function labelWidth(symbol){return Math.max(120,28+Array.from(symbol||'').length*15)}
   function progressionLayout(chordRows){
     const count=Math.max(0,...chordRows.map(row=>row?.length||0));
-    const widths=Array.from({length:count},(_,index)=>Math.max(...chordRows.map(row=>labelWidth(row?.[index]?.symbol))));
+    const widths=Array.from({length:count},(_,index)=>Math.max(...chordRows.map(row=>labelWidth(row?.[index]?.displaySymbol||row?.[index]?.symbol))));
     const centers=[];
     widths.forEach((nodeWidth,index)=>centers.push(index===0?118:centers[index-1]+(widths[index-1]+nodeWidth)/2));
     const width=Math.max(560,Math.ceil((centers.at(-1)||118)+(widths.at(-1)||120)/2+18));
@@ -76,8 +107,8 @@ const JazzNotation=(()=>{
   function harmonyRail(correctChords,mineChords,differences=[],providedLayout){
     const layout=providedLayout||progressionLayout([correctChords,mineChords]);
     const nodes=layout.centers.map((center,index)=>{
-      const correct=correctChords[index]?.symbol||'缺少';
-      const mine=mineChords[index]?.symbol||correct;
+      const correct=correctChords[index]?.displaySymbol||correctChords[index]?.symbol||'缺少';
+      const mine=mineChords[index]?.displaySymbol||mineChords[index]?.symbol||correct;
       const {left,width}=chordHitBounds(layout,layout.centers,index);
       if(!differences[index])return `<g class="jazz-harmony-choice" data-zone="shared" data-chord="${index}" role="button" tabindex="0" aria-label="试听第 ${index+1} 个和弦 ${correct}"><rect class="jazz-harmony-hit" x="${left}" y="8" width="${width}" height="48" rx="8"/><text class="jazz-harmony-symbol" x="${center}" y="40" text-anchor="middle">${correct}</text></g>`;
       return `<g class="jazz-harmony-node is-different" data-chord="${index}"><g class="jazz-harmony-choice is-correct" data-zone="correct" data-chord="${index}" role="button" tabindex="0" aria-label="试听正确答案第 ${index+1} 个和弦 ${correct}"><rect class="jazz-harmony-hit" x="${left}" y="2" width="${width}" height="29" rx="7"/><text class="jazz-harmony-symbol" x="${center}" y="23" text-anchor="middle">${correct}</text></g><g class="jazz-harmony-choice is-mine" data-zone="mine" data-chord="${index}" role="button" tabindex="0" aria-label="试听我的答案第 ${index+1} 个和弦 ${mine}"><rect class="jazz-harmony-hit" x="${left}" y="35" width="${width}" height="29" rx="7"/><text class="jazz-harmony-symbol" x="${center}" y="57" text-anchor="middle">${mine}</text></g></g>`;
@@ -120,7 +151,7 @@ const JazzNotation=(()=>{
       const hitLeft=Math.max(bounds.left,Math.min(centers[index]-commonWidth/2,bounds.left+bounds.width-commonWidth));
       const left=hitLeft/layout.width*100;
       const width=commonWidth/layout.width*100;
-      return `<button type="button" class="jazz-progression-chord ${differences[index]?'is-different':''}" data-zone="${zone}" data-chord="${index}" aria-label="试听${zone==='mine'?'我的答案':'正确答案'}第 ${index+1} 个和弦 ${chord.symbol}" style="--chord-left:${left}%;--chord-width:${width}%"></button>`;
+      return `<button type="button" class="jazz-progression-chord ${differences[index]?'is-different':''}" data-zone="${zone}" data-chord="${index}" aria-label="试听${zone==='mine'?'我的答案':'正确答案'}第 ${index+1} 个和弦 ${chord.displaySymbol||chord.symbol}" style="--chord-left:${left}%;--chord-width:${width}%"></button>`;
     }).join('');
     return `<div class="jazz-score-row is-${zone}" data-zone="${zone}" role="button" tabindex="0" aria-label="点击播放${zone==='mine'?'我的答案':'正确答案'}整段进行" style="--score-row-top:${topPercent}%;--score-row-height:${heightPercent}%"><span class="jazz-score-hover-surface" aria-hidden="true"></span>${buttons}</div>`;
   }
@@ -196,7 +227,7 @@ const JazzNotation=(()=>{
     return mountedLayout;
   }
 
-  return {spell,voiceEntries,vexVoicing,progressionLayout,harmonyRail,reviewScore,mountReviewScores};
+  return {spell,voiceEntries,vexVoicing,chordDisplaySymbol,progressionLayout,harmonyRail,reviewScore,mountReviewScores};
 })();
 if(typeof window!=='undefined')window.JazzNotation=JazzNotation;
 if(typeof module!=='undefined')module.exports=JazzNotation;

@@ -82,6 +82,12 @@ dialog{width:min(470px,calc(100% - 28px));padding:32px;border:1px solid var(--li
 
 .mode-cards:has([data-mode="jazz"]){grid-template-columns:repeat(3,minmax(0,1fr))}
 .jazz-pack-list,.jazz-voicing-list{display:grid;gap:9px}
+.pop-pack-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:720px){.pop-pack-list{grid-template-columns:1fr}}
+.chord-notation-cards .choice-card{width:100%;min-height:82px}
+.chord-notation-cards .choice-card:hover{border-color:var(--cyan);background:rgba(77,216,210,.06)}
+.chord-notation-cards .choice-card.is-selected:hover{border-color:var(--lime);background:rgba(201,255,85,.1)}
+.chord-notation-cards .choice-card:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
 .jazz-pack-list button,.jazz-voicing-list button{padding:13px 15px;border:1px solid var(--line);border-radius:11px;background:#091920;text-align:left;cursor:pointer}
 .jazz-pack-list button:hover,.jazz-voicing-list button:hover{border-color:var(--cyan)}
 .jazz-pack-list button.is-selected,.jazz-voicing-list button.is-selected{border-color:var(--lime);background:rgba(202,255,88,.08)}
