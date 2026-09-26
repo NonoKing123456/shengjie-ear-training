@@ -14,6 +14,14 @@ py -m http.server 4173 -d dist
 
 然后访问 `http://127.0.0.1:4173/`。
 
+## 在线访问与发布
+
+项目通过 GitHub Pages 发布 `dist/`，访问地址：
+
+https://nonoking123456.github.io/shengjie-ear-training/
+
+推送到 `main` 后，`.github/workflows/deploy-pages.yml` 会先运行测试，再自动发布网站。首次发布需在仓库的 **Settings → Pages → Build and deployment** 中将 Source 设为 **GitHub Actions**。
+
 ## 当前功能
 
 - 音程辨认：固定或随机起始音，可选上行、下行或随机交替；依次或同时发声，并提供五度内、八度内与双八度快捷范围

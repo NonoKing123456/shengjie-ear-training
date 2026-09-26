@@ -3,6 +3,10 @@ const JazzNotation=(()=>{
   const letters=['C','D','E','F','G','A','B'];
   const naturals=[0,2,4,5,7,9,11];
   const tones={
+    maj:[[0,0],[4,2],[7,4]],
+    min:[[0,0],[3,2],[7,4]],
+    dim:[[0,0],[3,2],[6,4]],
+    ger6:[[0,0],[4,2],[7,4],[10,5]],
     maj7:[[0,0],[4,2],[7,4],[11,6],[14,1],[21,5]],
     m7:[[0,0],[3,2],[7,4],[10,6],[14,1],[17,3],[21,5]],
     '7':[[0,0],[4,2],[7,4],[10,6],[14,1],[21,5]],
@@ -16,7 +20,7 @@ const JazzNotation=(()=>{
   const notationStore=new Map();let notationId=0;
 
   function spell(chord,midi){
-    const rootLetter=letters.indexOf(chord.symbol[0]);
+    const rootLetter=letters.indexOf(chord.rootLetter||chord.symbol[0]);
     const interval=(midi-chord.root+120)%12;
     const tone=tones[chord.quality].find(([semitones])=>semitones%12===interval);
     if(!tone)throw new Error(`Unexpected pitch ${midi} in ${chord.symbol}`);
@@ -32,6 +36,10 @@ const JazzNotation=(()=>{
   }
 
   function voiceEntries(chord){
+    if(chord.voices)return [
+      {midi:chord.voices.B,staff:'bass'},{midi:chord.voices.T,staff:'bass'},
+      {midi:chord.voices.A,staff:'treble'},{midi:chord.voices.S,staff:'treble'}
+    ];
     if(Array.isArray(chord.right))return [
       ...(chord.bass==null?[]:[{midi:chord.bass,staff:'bass'}]),
       ...chord.right.map(midi=>({midi,staff:'treble'}))
@@ -81,7 +89,7 @@ const JazzNotation=(()=>{
     const layout=providedLayout||progressionLayout([correctChords,mineChords||[]]);
     const id=`jazz-vexflow-${++notationId}`;
     notationStore.set(id,{correctChords,mineChords,differences,layout});
-    return `<div class="jazz-vexflow-review" data-jazz-vexflow-id="${id}" aria-label="爵士和弦五线谱"></div>`;
+    return `<div class="jazz-vexflow-review" data-jazz-vexflow-id="${id}" aria-label="和弦进行五线谱"></div>`;
   }
 
   function makeStaveNote(VF,chord,clef){
@@ -91,6 +99,15 @@ const JazzNotation=(()=>{
     entries.forEach((entry,index)=>{
       if(entry.accidental)note.addModifier(new VF.Accidental(entry.accidental),index);
     });
+    return note;
+  }
+
+  function makeSatbNote(VF,chord,voice){
+    const midi=chord.voices[voice],entry=spell(chord,midi);
+    const clef=voice==='S'||voice==='A'?'treble':'bass';
+    const note=new VF.StaveNote({clef,keys:[vexKey(entry)],duration:'q',stem_direction:voice==='S'||voice==='T'?1:-1});
+    const accidental=accidentalName(entry.accidental);
+    if(accidental)note.addModifier(new VF.Accidental(accidental),0);
     return note;
   }
 
@@ -105,7 +122,7 @@ const JazzNotation=(()=>{
       const width=commonWidth/layout.width*100;
       return `<button type="button" class="jazz-progression-chord ${differences[index]?'is-different':''}" data-zone="${zone}" data-chord="${index}" aria-label="试听${zone==='mine'?'我的答案':'正确答案'}第 ${index+1} 个和弦 ${chord.symbol}" style="--chord-left:${left}%;--chord-width:${width}%"></button>`;
     }).join('');
-    return `<div class="jazz-score-row is-${zone}" data-zone="${zone}" role="button" tabindex="0" aria-label="点击播放${zone==='mine'?'我的答案':'正确答案'}整段进行" style="--score-row-top:${topPercent}%;--score-row-height:${heightPercent}%">${buttons}</div>`;
+    return `<div class="jazz-score-row is-${zone}" data-zone="${zone}" role="button" tabindex="0" aria-label="点击播放${zone==='mine'?'我的答案':'正确答案'}整段进行" style="--score-row-top:${topPercent}%;--score-row-height:${heightPercent}%"><span class="jazz-score-hover-surface" aria-hidden="true"></span>${buttons}</div>`;
   }
 
   function drawScore(host,model){
@@ -125,11 +142,25 @@ const JazzNotation=(()=>{
     const context=renderer.getContext();
     const pairs=[{zone:'correct',chords:model.correctChords,top:0}];
     if(hasMine)pairs.push({zone:'mine',chords:model.mineChords,top:pairHeight+pairGap});
-    const staves=[],voices=[],noteRows=[];
+    const staves=[],voices=[],voiceStaves=[],noteRows=[];
     pairs.forEach(pair=>{
-      const treble=new VF.Stave(44,pair.top+22-staveLift,model.layout.width-58).addClef('treble');
-      const bass=new VF.Stave(44,pair.top+100-staveLift,model.layout.width-58).addClef('bass');
+      const treble=new VF.Stave(44,pair.top+22-staveLift,model.layout.width-58)
+        .setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE).addClef('treble');
+      const bass=new VF.Stave(44,pair.top+100-staveLift,model.layout.width-58)
+        .setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE).addClef('bass');
       staves.push(treble,bass);
+      if(pair.chords.every(chord=>chord.voices)){
+        const satbVoices=['S','A','T','B'];
+        const rows=satbVoices.map(voice=>pair.chords.map(chord=>makeSatbNote(VF,chord,voice)));
+        rows.forEach((notes,index)=>{
+          const stave=index<2?treble:bass;
+          notes.forEach(note=>note.setStave(stave));
+          voices.push(new VF.Voice({num_beats:pair.chords.length,beat_value:4}).setMode(VF.Voice.Mode.SOFT).addTickables(notes));
+          voiceStaves.push(stave);
+        });
+        noteRows.push({pair,trebleNotes:rows[0]});
+        return;
+      }
       const trebleNotes=pair.chords.map(chord=>makeStaveNote(VF,chord,'treble'));
       const bassNotes=pair.chords.map(chord=>makeStaveNote(VF,chord,'bass'));
       // Accidentals need each note's actual stave position before the shared formatter runs.
@@ -137,7 +168,7 @@ const JazzNotation=(()=>{
       bassNotes.forEach(note=>note.setStave(bass));
       const trebleVoice=new VF.Voice({num_beats:pair.chords.length,beat_value:4}).setMode(VF.Voice.Mode.SOFT).addTickables(trebleNotes);
       const bassVoice=new VF.Voice({num_beats:pair.chords.length,beat_value:4}).setMode(VF.Voice.Mode.SOFT).addTickables(bassNotes);
-      voices.push(trebleVoice,bassVoice);noteRows.push({pair,trebleNotes});
+      voices.push(trebleVoice,bassVoice);voiceStaves.push(treble,bass);noteRows.push({pair,trebleNotes});
     });
     staves.forEach(stave=>{
       stave.setContext(context).draw();
@@ -145,7 +176,7 @@ const JazzNotation=(()=>{
     });
     pairs.forEach((pair,index)=>new VF.StaveConnector(staves[index*2],staves[index*2+1]).setType(VF.StaveConnector.type.BRACE).setContext(context).draw());
     new VF.Formatter().joinVoices(voices).formatToStave(voices,staves[0]);
-    voices.forEach((voice,index)=>voice.draw(context,staves[index]));
+    voices.forEach((voice,index)=>voice.draw(context,voiceStaves[index]));
     const centers=noteRows[0].trebleNotes.map((note,index)=>note.getAbsoluteX()||model.layout.centers[index]);
     const hostRect=host.getBoundingClientRect();
     const clefRight=Math.max(...[...canvas.querySelectorAll('.vf-clef')].map(clef=>clef.getBoundingClientRect().right));

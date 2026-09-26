@@ -1,7 +1,7 @@
 // The notation and all replay actions are derived from the MIDI pitches used by the question.
 const STAFF_LETTERS=['C','D','E','F','G','A','B'];
 const NATURAL_PITCHES=[0,2,4,5,7,9,11];
-const ACCIDENTALS={'-2':'𝄫','-1':'♭',0:'',1:'♯',2:'𝄪'};
+const VEX_ACCIDENTALS={'-2':'bb','-1':'b',1:'#',2:'##'};
 
 function spelledRoot(midi){
   const preferred=['C','D','D','E','E','F','F','G','A','A','B','B'];
@@ -20,53 +20,69 @@ function spelledPair(rootMidi,targetMidi,intervalId,direction){
   return [root,{index:targetIndex,accidental:targetMidi-natural}];
 }
 
-function scoreSvg(notes,intervalId,direction,zone){
-  const spelled=spelledPair(notes[0],notes[1],intervalId,direction);
+function renderIntervalScore(host,notes,intervalId,direction){
+  const VF=window.VexFlow;
+  if(!VF)throw new Error('VexFlow is unavailable');
   const simultaneous=state.sessionConfig.intervalPlayback==='simultaneous';
-  const min=Math.min(...notes),max=Math.max(...notes);
-  const layout=min<42||max>90?'grand':min>=55?'treble':max<=65?'bass':'grand';
-  const height=layout==='grand'?230:158;
-  const staves=layout==='grand'?[{clef:'treble',top:42,bottom:90},{clef:'bass',top:144,bottom:192}]:[{clef:layout,top:54,bottom:102}];
-  const staffLines=staves.map(staff=>{
-    const lines=Array.from({length:5},(_,i)=>`<line x1="46" y1="${staff.top+i*12}" x2="438" y2="${staff.top+i*12}"/>`).join('');
-    const symbol=staff.clef==='treble'?'𝄞':'𝄢';
-    return `<g class="score-staff">${lines}<text class="score-clef" x="60" y="${staff.top+44}">${symbol}</text></g>`;
-  }).join('');
-  const positions=spelled.map((note,index)=>{
-    const clef=layout==='grand'?(notes[index]>=60?'treble':'bass'):layout;
-    const staff=staves.find(item=>item.clef===clef);
-    const base=clef==='treble'?30:18; // E4 and G2, the bottom staff lines.
-    let shownIndex=note.index;
-    let y=staff.bottom-(shownIndex-base)*6;
-    let octaveShift=0;
-    while(y<staff.top-24){shownIndex-=7;y+=42;octaveShift++}
-    while(y>staff.bottom+24){shownIndex+=7;y-=42;octaveShift--}
-    const x=simultaneous?240:index===0?159:340;
-    return {...note,staff,x,y,octaveShift,index};
+  const spelled=spelledPair(notes[0],notes[1],intervalId,direction);
+  const layout=Math.min(...notes)>=60?'treble':Math.max(...notes)<60?'bass':'grand';
+  const clefs=layout==='grand'?['treble','bass']:[layout];
+  const width=Math.max(320,Math.min(680,Math.floor(host.clientWidth||680)));
+  const baseHeight=layout==='grand'?224:158;
+  const staveTop=clef=>layout==='grand'?(clef==='treble'?12:104):28;
+  const clefFor=midi=>layout==='grand'?(midi>=60?'treble':'bass'):layout;
+  const noteY=spelled.map((spec,index)=>staveTop(clefFor(notes[index]))+40.5-(spec.index-(clefFor(notes[index])==='treble'?38:26))*5);
+  const topPad=Math.max(0,Math.ceil(18-Math.min(...noteY)));
+  const bottomPad=Math.max(0,Math.ceil(Math.max(...noteY)+18-baseHeight));
+  const height=baseHeight+topPad+bottomPad;
+  const canvas=document.createElement('div');canvas.className='interval-score-canvas';host.replaceChildren(canvas);
+  const renderer=new VF.Renderer(canvas,VF.Renderer.Backends.SVG);renderer.resize(width,height);
+  const context=renderer.getContext(),staves=new Map(),voices=[];
+  clefs.forEach(clef=>{
+    const stave=new VF.Stave(18,staveTop(clef)+topPad,width-36)
+      .setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE).addClef(clef);
+    stave.setContext(context).draw();stave.setNoteStartX(stave.getNoteStartX()+28);staves.set(clef,stave);
   });
-  if(simultaneous&&Math.abs(positions[0].y-positions[1].y)<=7&&positions[0].staff===positions[1].staff)positions[1].x+=21;
-  const marks=positions.map(note=>{
-    const {x,y,staff,index,octaveShift}=note;
-    const ledgers=[];
-    for(let ly=staff.top-12;ly>=y-1;ly-=12)ledgers.push(ly);
-    for(let ly=staff.bottom+12;ly<=y+1;ly+=12)ledgers.push(ly);
-    const ledger=ledgers.map(ly=>`<line class="score-ledger" x1="${x-18}" y1="${ly}" x2="${x+18}" y2="${ly}"/>`).join('');
-    const accidental=ACCIDENTALS[note.accidental]??(note.accidental>0?'♯':'♭');
-    const octaveLabel=octaveShift?`${Math.abs(octaveShift)===1?'8':Math.abs(octaveShift)===2?'15':'22'}${Math.abs(octaveShift)===1?(octaveShift>0?'va':'vb'):(octaveShift>0?'ma':'mb')}`:'';
-    const annotation=octaveLabel?`<text class="score-octave" x="${x}" y="${octaveShift>0?Math.max(23,y-29):Math.min(height-8,y+38)}">${octaveLabel}</text>`:'';
-    const order=simultaneous?'':`<text class="score-order" x="${x+25}" y="${y-14}">${index===0?'①':'②'}</text>`;
-    return `<g class="score-note" role="button" tabindex="0" data-zone="${zone}" data-note="${index}" aria-label="单独听${zone==='mine'?'我的答案':'正确答案'}第${index===0?'一':'二'}个音"><title>单独听第${index===0?'一':'二'}个音</title>${ledger}${annotation}<text class="score-accidental" x="${x-29}" y="${y+7}">${accidental}</text><ellipse class="score-head" cx="${x}" cy="${y}" rx="12" ry="8" transform="rotate(-18 ${x} ${y})"/><line class="score-stem" x1="${x+11}" y1="${y-2}" x2="${x+11}" y2="${y-42}"/>${order}<circle class="score-hit" cx="${x}" cy="${y}" r="13"/></g>`;
-  }).join('');
-  const arrow=simultaneous?'':`<path class="score-arrow" d="M 203 ${Math.max(28,Math.min(height-20,positions[0].y))} Q 250 18 298 ${Math.max(28,Math.min(height-20,positions[1].y))}"/><path class="score-arrow-head" d="M 291 ${Math.max(28,Math.min(height-20,positions[1].y))-5} L 300 ${Math.max(28,Math.min(height-20,positions[1].y))} L 291 ${Math.max(28,Math.min(height-20,positions[1].y))+5}"/>`;
-  return `<svg class="interval-score" viewBox="0 0 480 ${height}" role="group" aria-label="${simultaneous?'同时发声':'依次发声'}的音程五线谱">${staffLines}${arrow}${marks}</svg>`;
+  const makeNote=(specs,clef)=>{
+    const sorted=[...specs].sort((a,b)=>a.index-b.index);
+    const note=new VF.StaveNote({clef,keys:sorted.map(spec=>`${STAFF_LETTERS[((spec.index%7)+7)%7].toLowerCase()}/${Math.floor(spec.index/7)}`),duration:'q',auto_stem:true});
+    sorted.forEach((spec,index)=>{const mark=VEX_ACCIDENTALS[spec.accidental];if(mark)note.addModifier(new VF.Accidental(mark),index)});
+    note.setStave(staves.get(clef));return note;
+  };
+  const noteObjects=Array(2);
+  clefs.forEach(clef=>{
+    const tickables=[];
+    if(simultaneous){
+      const entries=spelled.map((spec,index)=>({spec,index})).filter(({index})=>clefFor(notes[index])===clef);
+      if(entries.length){const note=makeNote(entries.map(entry=>entry.spec),clef);entries.forEach(entry=>noteObjects[entry.index]=note);tickables.push(note)}
+      else tickables.push(new VF.GhostNote({duration:'q'}));
+    }else spelled.forEach((spec,index)=>{
+      if(clefFor(notes[index])===clef){const note=makeNote([spec],clef);noteObjects[index]=note;tickables.push(note)}
+      else tickables.push(new VF.GhostNote({duration:'q'}));
+    });
+    voices.push({stave:staves.get(clef),voice:new VF.Voice({num_beats:simultaneous?1:2,beat_value:4}).setMode(VF.Voice.Mode.SOFT).addTickables(tickables)});
+  });
+  new VF.Formatter().joinVoices(voices.map(item=>item.voice)).formatToStave(voices.map(item=>item.voice),voices[0].stave);
+  voices.forEach(item=>item.voice.draw(context,item.stave));
+  const svg=canvas.querySelector('svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('role','group');svg.setAttribute('aria-label',`${simultaneous?'同时发声':'依次发声'}的音程五线谱`);
+  if(!simultaneous){
+    const centers=noteObjects.map(note=>note.getAbsoluteX());
+    const NS='http://www.w3.org/2000/svg';
+    centers.forEach((center,index)=>{
+      const left=index===0?Math.max(80,center-65):(centers[0]+center)/2+5;
+      const right=index===0?(center+centers[1])/2-5:Math.min(width-16,center+65);
+      const hit=document.createElementNS(NS,'rect');
+      for(const [name,value] of Object.entries({x:left,y:10,width:Math.max(28,right-left),height:height-20,rx:9,class:'interval-note-hit','data-note':index,role:'button',tabindex:0,'aria-label':`试听第 ${index+1} 个音`}))hit.setAttribute(name,String(value));
+      svg.append(hit);
+    });
+  }
 }
 
 function reviewZone(zone,label,interval,notes,direction){
   const correct=zone==='correct';
-  return `<section class="review-zone ${correct?'is-correct':'is-mine'}" data-zone="${zone}" aria-label="${label}">
-    <div class="review-zone-title"><strong>${correct?'✓':'○'} ${label}：${interval.name}</strong><span>${interval.semitones} 个半音</span></div>
-    ${scoreSvg(notes,interval.id,direction,zone)}
-    <div class="review-zone-actions"><button type="button" data-play="${zone}">重听${correct?'正确音程':'我的答案'}</button><button type="button" data-play="single" data-zone="${zone}" data-note="0">单独听${correct?'第一个音':'音 ①'}</button><button type="button" data-play="single" data-zone="${zone}" data-note="1">单独听${correct?'第二个音':'音 ②'}</button></div>
+  return `<section class="review-zone interval-review-row ${correct?'is-correct':'is-mine'}" data-zone="${zone}" aria-label="${label}">
+    <div class="review-zone-title"><strong>${label}：${interval.name}</strong><span>${interval.semitones} 个半音</span></div>
+    <div class="interval-score-host" data-zone="${zone}" role="button" tabindex="0" aria-label="点击播放${label}整段音程"></div>
   </section>`;
 }
 
@@ -83,7 +99,7 @@ function renderJazzReview(correct){
   const nextLabel=state.index===state.sessionConfig.questionCount-1?'查看本轮结果 →':'下一题 →';
   const firstDifference=differences[0];
   const score=JazzNotation.reviewScore(actual.voicings,correct?null:mine.voicings,differenceMap,layout);
-  panel.innerHTML=`<div class="review-heading ${correct?'is-correct':'is-wrong'}"><strong>${correct?'✓ 答对了':`✕ 答错了 · 第 ${firstDifference.index+1} 个和弦不同`}</strong><span>${state.index+1} / ${state.sessionConfig.questionCount} · ${question.keyName} ${tonalityNames[question.tonality]}</span></div>
+  panel.innerHTML=`<div class="review-heading ${correct?'is-correct':'is-wrong'}"><strong>${correct?'✓ 答对了':`✕ 答错了 · 第 ${firstDifference.index+1} 个和弦不同`}</strong></div>
     <div class="jazz-review-score-scroll"><div class="jazz-review-score-canvas" style="--jazz-score-width:${layout.width}px"><div class="jazz-harmony-rail-host"></div>${score}</div></div>
     <div class="review-footer"><button type="button" class="review-next" data-next>${nextLabel}</button></div>
     <span class="sr-only" id="review-playback-status" role="status" aria-live="polite"></span>`;
@@ -95,32 +111,36 @@ function renderReview(correct){
   const panel=$('#review-content'),question=state.question,interval=state.sessionConfig.mode==='interval';
   $('#sound-stage').classList.add('is-review');$('#play-question').classList.add('is-hidden');panel.classList.remove('is-hidden');
   const nextLabel=state.index===state.sessionConfig.questionCount-1?'查看本轮结果 →':'下一题 →';
-  if(state.sessionConfig.mode==='jazz'){renderJazzReview(correct)}
+  if(state.sessionConfig.mode==='chordProgression'){renderJazzReview(correct)}
   else if(interval){
     const selected=intervalBank.find(item=>item.id===state.selectedAnswer);
     const correctNotes=[question.rootMidi,question.targetMidi];
     const mineNotes=[question.rootMidi,question.rootMidi+question.direction*selected.semitones];
-    const heading=correct?`<div class="review-heading is-correct"><strong>✓ 回答正确</strong><span>${question.name} · ${question.semitones} 个半音</span></div>`:
-      `<div class="review-heading is-wrong"><strong>✕ 这题答错了</strong><span>你的答案：${selected.name}　正确答案：${question.name}　相差 ${Math.abs(selected.semitones-question.semitones)} 个半音</span></div>`;
+    const heading=correct?`<div class="review-heading is-correct"><strong>✓ 答对了</strong><span>${question.name} · ${question.semitones} 个半音</span></div>`:
+      `<div class="review-heading is-wrong"><strong>✕ 答错了</strong><span>你的答案：${selected.name}　正确答案：${question.name}　相差 ${Math.abs(selected.semitones-question.semitones)} 个半音</span></div>`;
     panel.innerHTML=`${heading}<div class="review-zones">${reviewZone('correct','正确答案',question,correctNotes,question.direction)}${correct?'':reviewZone('mine','我的答案',selected,mineNotes,question.direction)}</div>
-      <div class="review-footer"><div class="review-footer-actions"><button type="button" data-play="question">再听一次题目</button>${correct?'':'<button type="button" data-play="ab">AB 对比播放</button>'}</div><button type="button" class="review-next" data-next>${nextLabel}</button></div><p class="review-playback-status" id="review-playback-status" role="status" aria-live="polite">点击谱面音符可单独试听 · 空格键重听题目</p>`;
-  }else{
-    panel.innerHTML=`<div class="review-heading ${correct?'is-correct':'is-wrong'}"><strong>${correct?'✓ 回答正确':'✕ 这题答错了'}</strong><span>正确答案：${question.name}</span></div><div class="review-footer"><button type="button" data-play="question">再听一次题目</button><button type="button" class="review-next" data-next>${nextLabel}</button></div><p class="review-playback-status" id="review-playback-status" role="status" aria-live="polite">空格键重听题目</p>`;
-  }
+      <div class="review-footer"><button type="button" class="review-next" data-next>${nextLabel}</button></div><span class="sr-only" id="review-playback-status" role="status" aria-live="polite"></span>`;
+    renderIntervalScore(panel.querySelector('.interval-score-host[data-zone="correct"]'),correctNotes,question.id,question.direction);
+    if(!correct)renderIntervalScore(panel.querySelector('.interval-score-host[data-zone="mine"]'),mineNotes,selected.id,question.direction);
+  }else throw new Error('Unsupported review mode');
 }
 
 $('#review-content').addEventListener('click',event=>{
-  const target=event.target.closest('[data-next],[data-play],.score-note,.jazz-harmony-choice,.jazz-progression-chord,.jazz-score-row');if(!target)return;
+  const target=event.target.closest('[data-next],.interval-note-hit,.interval-score-host,.jazz-harmony-choice,.jazz-progression-chord,.jazz-score-row');if(!target)return;
   if(target.hasAttribute('data-next')){nextQuestion();return}
-  if(target.classList.contains('score-note')){void startPlayback('single',target.dataset.zone,Number(target.dataset.note));return}
+  if(target.classList.contains('interval-note-hit')){void startPlayback('single',target.closest('.interval-score-host').dataset.zone,Number(target.dataset.note));return}
+  if(target.classList.contains('interval-score-host')){void startPlayback(target.dataset.zone,target.dataset.zone);return}
   if(target.classList.contains('jazz-harmony-choice')){void startPlayback('single',target.dataset.zone==='shared'?'correct':target.dataset.zone,Number(target.dataset.chord));return}
   if(target.classList.contains('jazz-progression-chord')){void startPlayback('single',target.dataset.zone,Number(target.dataset.chord));return}
   if(target.classList.contains('jazz-score-row')){void startPlayback(target.dataset.zone,target.dataset.zone);return}
-  void startPlayback(target.dataset.play,target.dataset.zone||'correct',Number(target.dataset.note||0));
 });
 $('#review-content').addEventListener('keydown',event=>{
-  const note=event.target.closest('.score-note');if(!note||event.code!=='Enter')return;
-  event.preventDefault();event.stopPropagation();void startPlayback('single',note.dataset.zone,Number(note.dataset.note));
+  const note=event.target.closest('.interval-note-hit');if(!note||!['Enter','Space'].includes(event.code))return;
+  event.preventDefault();event.stopPropagation();void startPlayback('single',note.closest('.interval-score-host').dataset.zone,Number(note.dataset.note));
+});
+$('#review-content').addEventListener('keydown',event=>{
+  const score=event.target.closest('.interval-score-host');if(!score||event.target!==score||!['Enter','Space'].includes(event.code))return;
+  event.preventDefault();event.stopPropagation();void startPlayback(score.dataset.zone,score.dataset.zone);
 });
 $('#review-content').addEventListener('keydown',event=>{
   const chord=event.target.closest('.jazz-harmony-choice');if(!chord||!['Enter','Space'].includes(event.code))return;

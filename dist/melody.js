@@ -258,7 +258,8 @@
     const renderer = new VF.Renderer(canvas, VF.Renderer.Backends.SVG);
     renderer.resize(width, height);
     const context = renderer.getContext();
-    const stave = new VF.Stave(20, compact ? 38 : 50, width - 40).addClef('treble');
+    const stave = new VF.Stave(20, compact ? 38 : 50, width - 40)
+      .setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE).addClef('treble');
     if (signature) stave.addKeySignature(signature.vexKey);
     stave.setContext(context).draw();
     stave.setNoteStartX(stave.getNoteStartX() + 22);
